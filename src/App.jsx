@@ -8,23 +8,12 @@ import {
   LogOut, UserCircle, KeyRound, BookOpen, GraduationCap, BadgeInfo, Edit3, ImagePlus, Check
 } from 'lucide-react';
 
-// 파이어베이스 코어 모듈을 불러옵니다.
 import { initializeApp } from 'firebase/app';
 import { 
-  getFirestore,
-  collection, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs,
-  query
+  getFirestore, collection, onSnapshot, doc, 
+  setDoc, updateDoc, deleteDoc, getDocs, query
 } from 'firebase/firestore';
 
-// --- 파이어베이스 설정 (기지국 연결) ---
-// 주의: 내 컴퓨터(VS Code)에서 실행할 때는 아래 임시 텍스트를 지우고, 
-// 파이어베이스 콘솔에서 복사한 본인의 실제 firebaseConfig 값으로 교체해야 합니다.
 const firebaseConfig = {
   apiKey: "AIzaSyAi8auHjahGA-AFGWYW-Ig1kaF4FWwu6Cc",
   authDomain: "avalon-593e7.firebaseapp.com",
@@ -35,11 +24,9 @@ const firebaseConfig = {
   measurementId: "G-DDQL245JG0"
 };
 
-// 파이어베이스 엔진을 가동합니다.
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- INITIAL MOCK DATA (최초 1회 데이터베이스가 비어있을 때 자동 서버 업로드용) ---
 const INITIAL_USERS = [
   { id: 'u1', username: 'admin', password: '1234', department: '컴퓨터공학과', year: 3, joinYear: 2026, realName: '김보드', name: '보드마스터', coins: 15000, avatar: 'https://i.pravatar.cc/150?u=u1', role: 'admin' },
   { id: 'u2', username: 'user1', password: '1234', department: '경영학과', year: 2, joinYear: 2026, realName: '이전략', name: '전략의신', coins: 12500, avatar: 'https://i.pravatar.cc/150?u=u2', role: 'user' },
@@ -49,27 +36,18 @@ const INITIAL_USERS = [
 ];
 
 const INITIAL_TOURNAMENTS = [
-  { 
-    id: 't1', 
-    title: '2026 스프링 챔피언십 (코인 쟁탈전)', 
-    description: '최고의 보드게임 전략가들이 모여 코인을 쟁취하는 대규모 토너먼트입니다. 패배를 두려워하지 마세요!',
-    startDate: '2026-05-01', 
-    endDate: '2026-05-31',
-    status: 'active',
-    weeklyCoin: 1000,
-    payoutDay: '월'
-  }
+  { id: 't1', title: '2026 스프링 챔피언십 (코인 쟁탈전)', description: '최고의 보드게임 전략가들이 모여 코인을 쟁취하는 대규모 토너먼트입니다. 패배를 두려워하지 마세요!', startDate: '2026-05-01', endDate: '2026-05-31', status: 'active', weeklyCoin: 1000, payoutDay: '월' }
 ];
 
 const INITIAL_MATCHES = [
   { id: 'm1', tId: 't1', type: '1v1', gameTitle: '테라포밍 마스', playerIds: ['u1', 'u2'], bet: 1000, status: 'pending', winners: [], rewardPerWinner: 0 },
   { id: 'm2', tId: 't1', type: 'multi', gameTitle: '아발론', playerIds: ['u1', 'u3', 'u4'], bet: 500, status: 'pending', winners: [], rewardPerWinner: 0 },
-  { id: 'm3', tId: 't1', type: '1v1', gameTitle: '스플렌더', playerIds: ['u3', 'u4'], bet: 300, status: 'pending', winners: [], rewardPerWinner: 0 },
-  { id: 'm4', tId: 't1', type: '1v1', gameTitle: '세븐 원더스', playerIds: ['u2', 'u5'], bet: 800, status: 'pending', winners: [], rewardPerWinner: 0 },
   { id: 'm5', tId: 't1', type: '1v1', gameTitle: '카탄', playerIds: ['u1', 'u5'], bet: 600, status: 'completed', winners: ['u1'], rewardPerWinner: 1200 },
 ];
 
 const WEEK_DAYS = ['월', '화', '수', '목', '금', '토', '일'];
+
+const DEFAULT_LOGO = 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=300&auto=format&fit=crop';
 
 const toLocalDateString = (date) => {
   const year = date.getFullYear();
@@ -85,7 +63,38 @@ const getDisplayYear = (yearNum, joinYear) => {
   return calculatedYear >= 5 ? 'N학년' : `${calculatedYear}학년`;
 };
 
-// --- UI COMPONENTS ---
+// 이미지 용량 최적화 및 리사이징 엔진 (Firestore 1MB 한계 극복용)
+const compressImage = (file, maxSize = 300) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // 비율 유지하며 최대 사이즈로 축소
+        if (width > height) {
+          if (width > maxSize) { height *= maxSize / width; width = maxSize; }
+        } else {
+          if (height > maxSize) { width *= maxSize / height; height = maxSize; }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // JPEG 포맷으로 화질 80% 압축 (Base64 텍스트 반환)
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+    };
+  });
+};
+
 const Card = ({ children, className = '' }) => (
   <div className={`bg-slate-800/60 border border-slate-700/50 backdrop-blur-md rounded-2xl p-5 shadow-xl ${className}`}>
     {children}
@@ -108,14 +117,13 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
 };
 
 export default function App() {
-  // --- 중앙 집중식 클라우드 상태 관리 (Real-time Sync States) ---
   const [users, setUsers] = useState([]);
   const [tournaments, setTournaments] = useState(INITIAL_TOURNAMENTS);
   const [matches, setMatches] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [coinHistory, setCoinHistory] = useState([]);
+  const [appLogo, setAppLogo] = useState(DEFAULT_LOGO); // 로고 상태
 
-  // Auth & UI States
   const [loggedInUserId, setLoggedInUserId] = useState(() => localStorage.getItem('avalon_loggedInUserId') || null);
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('avalon_loggedInUserId'));
   const [rankingAlert, setRankingAlert] = useState('');
@@ -129,10 +137,10 @@ export default function App() {
 
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [profileEditData, setProfileEditData] = useState({ name: '', department: '', year: '', avatar: '' });
+  const [isUploading, setIsUploading] = useState(false); // 업로드 로딩 상태
 
   const [currentView, setCurrentView] = useState('home');
   
-  // 주간 달력 설정
   const [currentWeekBaseDate, setCurrentWeekBaseDate] = useState(() => {
     const today = new Date();
     const day = today.getDay();
@@ -151,7 +159,6 @@ export default function App() {
     maxAttendees: 11
   });
 
-  // 경기 제어 서랍 상태들
   const [showTournamentSettings, setShowTournamentSettings] = useState(false);
   const [editTournamentData, setEditTournamentData] = useState(null);
   
@@ -180,63 +187,61 @@ export default function App() {
   const [adminCoinAmount, setAdminCoinAmount] = useState('');
   const [adminCoinReason, setAdminCoinReason] = useState('');
   const [userToDelete, setUserToDelete] = useState(null);
-  
-  const [appLogo, setAppLogo] = useState(() => localStorage.getItem('avalon_appLogo') || 'ChatGPT Image 2026년 5월 14일 오후 03_23_55.png');
 
-  // --- 클라우드 실시간 스트리밍 감시 카메라 (onSnapshot Data Pipeline) ---
   useEffect(() => {
-    // 1. 유저 정보 실시간 동기화 및 최초 실행시 자동 DB 데이터 셋업(Seed) 로직
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      if (snapshot.empty) {
-        INITIAL_USERS.forEach(async (u) => {
-          await setDoc(doc(db, "users", u.id), u);
-        });
+    // 1. App Settings (Global Logo Sync)
+    const unsubSettings = onSnapshot(doc(db, "settings", "appInfo"), (snapshot) => {
+      if (snapshot.exists()) {
+        setAppLogo(snapshot.data().logo || DEFAULT_LOGO);
       } else {
-        const list = snapshot.docs.map(doc => doc.data());
-        setUsers(list);
+        setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO });
       }
     }, (error) => console.error(error));
 
-    // 2. 대회 진행 현황 배너 동기화
+    // 2. 유저 정보
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      if (snapshot.empty) {
+        INITIAL_USERS.forEach(async (u) => { await setDoc(doc(db, "users", u.id), u); });
+      } else {
+        setUsers(snapshot.docs.map(doc => doc.data()));
+      }
+    }, (error) => console.error(error));
+
+    // 3. 대회 현황
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
       if (snapshot.empty) {
-        INITIAL_TOURNAMENTS.forEach(async (t) => {
-          await setDoc(doc(db, "tournaments", t.id), t);
-        });
+        INITIAL_TOURNAMENTS.forEach(async (t) => { await setDoc(doc(db, "tournaments", t.id), t); });
       } else {
         setTournaments(snapshot.docs.map(doc => doc.data()));
       }
     }, (error) => console.error(error));
 
-    // 3. 매치 내역 실시간 연동
+    // 4. 매치 내역
     const unsubMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
       if (snapshot.empty && users.length > 0) {
-        INITIAL_MATCHES.forEach(async (m) => {
-          await setDoc(doc(db, "matches", m.id), m);
-        });
+        INITIAL_MATCHES.forEach(async (m) => { await setDoc(doc(db, "matches", m.id), m); });
       } else {
         const list = snapshot.docs.map(doc => doc.data());
         setMatches(list.sort((a, b) => b.id.localeCompare(a.id)));
       }
     }, (error) => console.error(error));
 
-    // 4. 모임 일정 실시간 연동
+    // 5. 모임 일정
     const unsubSchedules = onSnapshot(collection(db, "schedules"), (snapshot) => {
       setSchedules(snapshot.docs.map(doc => doc.data()));
     }, (error) => console.error(error));
 
-    // 5. 코인 관리 장부 실시간 연동
+    // 6. 코인 장부
     const unsubHistory = onSnapshot(collection(db, "coinHistory"), (snapshot) => {
       const list = snapshot.docs.map(doc => doc.data());
       setCoinHistory(list.sort((a, b) => b.id.localeCompare(a.id)));
     }, (error) => console.error(error));
 
     return () => {
-      unsubUsers(); unsubTournaments(); unsubMatches(); unsubSchedules(); unsubHistory();
+      unsubSettings(); unsubUsers(); unsubTournaments(); unsubMatches(); unsubSchedules(); unsubHistory();
     };
   }, [users.length]);
 
-  // 메모리 최적화 맵 및 랭킹 정렬 계산부
   const currentUser = useMemo(() => {
     return users.find(u => u.id === loggedInUserId) || users[0] || { id: '', name: '로딩중', coins: 0, role: 'user', avatar: 'https://i.pravatar.cc/150' };
   }, [users, loggedInUserId]);
@@ -249,7 +254,6 @@ export default function App() {
     return [...users].sort((a, b) => (b.coins || 0) - (a.coins || 0));
   }, [users]);
 
-  // 명예의 전당 순위 추적 경보 장치
   useEffect(() => {
     const currentTop3 = [...users].sort((a, b) => (b.coins || 0) - (a.coins || 0)).slice(0, 3).map(u => u.id);
     if (prevTop3Ref.current.length > 0 && JSON.stringify(prevTop3Ref.current) !== JSON.stringify(currentTop3)) {
@@ -263,10 +267,6 @@ export default function App() {
     if (loggedInUserId) localStorage.setItem('avalon_loggedInUserId', loggedInUserId);
     else localStorage.removeItem('avalon_loggedInUserId');
   }, [loggedInUserId]);
-
-  useEffect(() => {
-    localStorage.setItem('avalon_appLogo', appLogo);
-  }, [appLogo]);
 
   const currentWeekDates = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
@@ -282,7 +282,6 @@ export default function App() {
     setSelectedDateObj(newDate);
   }, [weekOffset, currentWeekBaseDate]);
 
-  // 자동 주간 정기 모임 가상 스키마 생성부
   useEffect(() => {
     if (users.length === 0) return;
     const baseDate = new Date(currentWeekBaseDate);
@@ -294,21 +293,14 @@ export default function App() {
       
       if (!schedules.find(s => s.date === dateString && s.isAuto)) {
         const autoSche = {
-          id: `auto_${dateString}`,
-          title: '정규 모임',
-          date: dateString,
-          time: '19:00 ~ 23:00',
-          location: '아발론 동아리방',
-          attendees: [],
-          maxAttendees: 11,
-          isAuto: true
+          id: `auto_${dateString}`, title: '정규 모임', date: dateString, time: '19:00 ~ 23:00',
+          location: '아발론 동아리방', attendees: [], maxAttendees: 11, isAuto: true
         };
         setDoc(doc(db, "schedules", autoSche.id), autoSche);
       }
     }
   }, [currentWeekBaseDate, schedules, users.length]);
 
-  // --- 데이터베이스 핵심 쓰기 트랜잭션 함수군 (Cloud Data Writers) ---
   const logCoinHistory = async (userId, amount, desc) => {
     if (amount === 0) return;
     const logId = `h_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -354,12 +346,19 @@ export default function App() {
     setShowProfileEdit(true);
   };
 
-  const handleImageUpload = (e) => {
+  // 개인 프로필 사진 첨부 및 압축
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setProfileEditData({ ...profileEditData, avatar: reader.result });
-      reader.readAsDataURL(file);
+      setIsUploading(true);
+      try {
+        const compressedBase64 = await compressImage(file, 200); // 프로필은 최대 200px 압축
+        setProfileEditData({ ...profileEditData, avatar: compressedBase64 });
+      } catch (err) {
+        console.error("이미지 처리 실패:", err);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -371,6 +370,28 @@ export default function App() {
       avatar: profileEditData.avatar
     });
     setShowProfileEdit(false);
+  };
+
+  // 관리자 앱 로고 첨부 및 글로벌 압축 적용
+  const handleAppLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setIsUploading(true);
+      try {
+        const compressedBase64 = await compressImage(file, 400); // 앱 로고는 최대 400px 압축
+        // 전역 Firestore 문서 업데이트
+        await setDoc(doc(db, "settings", "appInfo"), { logo: compressedBase64 }, { merge: true });
+      } catch (err) {
+        console.error("로고 업로드 실패:", err);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+  
+  // 앱 기본 로고로 복구 (관리자)
+  const restoreDefaultLogo = async () => {
+    await setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO }, { merge: true });
   };
 
   const handleLogoClick = () => {
@@ -401,7 +422,6 @@ export default function App() {
     if (!userToDelete || userToDelete === currentUser.id) return; 
     
     await deleteDoc(doc(db, "users", userToDelete));
-    
     schedules.forEach(async (s) => {
       if (s.attendees.includes(userToDelete)) {
         await updateDoc(doc(db, "schedules", s.id), {
@@ -514,15 +534,6 @@ export default function App() {
     setResolveMatchData(null); setResolveWinners([]);
   };
 
-  const handleAppLogoUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setAppLogo(reader.result);
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleAddSchedule = async () => {
     if (!newScheduleData.title || !newScheduleData.date) return;
     const scheId = `s_${Date.now()}`;
@@ -537,13 +548,12 @@ export default function App() {
     setShowAddSchedule(false);
   };
 
-  // --- RENDER BLOCK (SECURITY GATE) ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#0a0f1c] flex flex-col items-center justify-center p-4 selection:bg-amber-500/30 font-sans relative overflow-hidden">
         <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/50 p-8 rounded-3xl w-full max-w-md shadow-2xl relative z-10">
           <div className="flex flex-col items-center mb-8">
-            <img src={appLogo} alt="Avalon" className="w-24 h-24 rounded-2xl object-cover object-center shadow-lg shadow-amber-500/20 mb-4" />
+            <img src={appLogo} alt="Avalon" className="w-24 h-24 rounded-2xl object-cover object-center shadow-lg shadow-amber-500/20 mb-4 bg-slate-900" />
             <h1 className="text-3xl font-black text-white tracking-tight">AVALON</h1>
           </div>
           {authError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-xl mb-6 text-center">{authError}</div>}
@@ -598,7 +608,7 @@ export default function App() {
             <div key={user.id} className={`flex items-center justify-between p-4 rounded-xl transition-all ${index === 0 ? 'bg-gradient-to-r from-amber-500/20 border border-amber-500/30' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}>
               <div className="flex items-center gap-4">
                 <div className={`w-8 h-8 flex items-center justify-center font-bold text-lg rounded-full ${index === 0 ? 'bg-amber-400 text-slate-900 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : index === 1 ? 'bg-slate-300 text-slate-900' : index === 2 ? 'bg-amber-700 text-white' : 'text-slate-500'}`}>{index + 1}</div>
-                <img src={user.avatar} className="w-12 h-12 rounded-full border-2 border-slate-700 object-cover" />
+                <img src={user.avatar} className="w-12 h-12 rounded-full border-2 border-slate-700 object-cover bg-slate-900" />
                 <div><div className="font-bold text-white flex items-center gap-2">{user.name}{index === 0 && <Crown size={16} className="text-amber-400" />}</div></div>
               </div>
               <div className="flex items-center gap-2 font-mono text-lg font-bold text-amber-400"><Coins size={18} />{(user.coins || 0).toLocaleString()}</div>
@@ -656,7 +666,7 @@ export default function App() {
                   <div className="text-sm font-bold text-amber-400 mb-1">{match.gameTitle || '미지정 게임'}</div>
                   <div className="text-xs text-slate-400 mb-2">{match.type === '1v1' ? '1대1 결투' : '다인원 매치'} • 총 {match.bet * (match.playerIds?.length || 1)}C</div>
                   <div className="flex -space-x-2">
-                    {match.playerIds?.map(id => <img key={id} src={userMap[id]?.avatar} className="w-6 h-6 rounded-full border-2 border-slate-800 object-cover" title={userMap[id]?.name}/>)}
+                    {match.playerIds?.map(id => <img key={id} src={userMap[id]?.avatar} className="w-6 h-6 rounded-full border-2 border-slate-800 object-cover bg-slate-900" title={userMap[id]?.name}/>)}
                   </div>
                 </div>
               ))}
@@ -676,7 +686,7 @@ export default function App() {
                   <div className="relative mb-3"><input type="text" value={searchOpponent1v1} onChange={e => setSearchOpponent1v1(e.target.value)} placeholder="이름으로 찾기..." className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 pl-9 text-sm text-white focus:border-amber-500 outline-none" /><Search size={16} className="absolute left-3 top-3 text-slate-500" /></div>
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                     {searchFilteredUsers1v1.map(u => (
-                      <button key={u.id} onClick={() => setSelectedOpponent1v1(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponent1v1 === u.id ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover" />{u.name}</button>
+                      <button key={u.id} onClick={() => setSelectedOpponent1v1(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponent1v1 === u.id ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover bg-slate-800" />{u.name}</button>
                     ))}
                     {searchFilteredUsers1v1.length === 0 && <div className="text-xs text-slate-500 w-full text-center">검색 결과가 없습니다.</div>}
                   </div>
@@ -714,32 +724,32 @@ export default function App() {
                   <div className="relative mb-3"><input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 pl-9 text-sm text-white focus:border-amber-500 outline-none" /><Search size={16} className="absolute left-3 top-3 text-slate-500" /></div>
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                     {searchFilteredUsersMulti.map(u => (
-                      <button key={u.id} onClick={() => toggleMultiOpponent(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponentsMulti.includes(u.id) ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover" />{u.name}</button>
+                      <button key={u.id} onClick={() => toggleMultiOpponent(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponentsMulti.includes(u.id) ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover bg-slate-800" />{u.name}</button>
                     ))}
                   </div>
                 </div>
                 <div><label className="block text-sm text-slate-300 mb-2">1인당 베팅할 코인</label><div className="relative"><input type="number" value={betAmountMulti} onChange={(e) => setBetAmountMulti(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 pl-10 text-white focus:border-amber-500 outline-none" /><Coins size={18} className="absolute left-3 top-3.5 text-amber-500" /></div></div>
                 <Button className="w-full mt-2" onClick={handleCreateMultiMatch} disabled={!gameTitleMulti || selectedOpponentsMulti.length === 0 || !betAmountMulti}><Swords size={18} /> 다인원 시작</Button>
+              </div>
+            </Card>
+            <Card className="lg:col-span-2 flex flex-col">
+              <div className="space-y-3 flex-1">
+                {displayedMatchesMulti.length === 0 && <div className="text-center text-slate-500 py-10">생성된 다인원 매치가 없습니다.</div>}
+                {displayedMatchesMulti.map(match => renderMatchItem(match))}
+              </div>
+              {totalMultiPages > 1 && (
+                <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-700/50">
+                  <button onClick={() => setPageMulti(p => Math.max(1, p - 1))} disabled={pageMulti === 1} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronLeft size={20}/></button>
+                  <span className="text-sm font-bold text-amber-400">{pageMulti} <span className="text-slate-500">/ {totalMultiPages}</span></span>
+                  <button onClick={() => setPageMulti(p => Math.min(totalMultiPages, p + 1))} disabled={pageMulti === totalMultiPages} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronRight size={20}/></button>
+                </div>
+              )}
+            </Card>
           </div>
-        </Card>
-        <Card className="lg:col-span-2 flex flex-col">
-          <div className="space-y-3 flex-1">
-            {displayedMatchesMulti.length === 0 && <div className="text-center text-slate-500 py-10">생성된 다인원 매치가 없습니다.</div>}
-            {displayedMatchesMulti.map(match => renderMatchItem(match))}
-          </div>
-          {totalMultiPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-700/50">
-              <button onClick={() => setPageMulti(p => Math.max(1, p - 1))} disabled={pageMulti === 1} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronLeft size={20}/></button>
-              <span className="text-sm font-bold text-amber-400">{pageMulti} <span className="text-slate-500">/ {totalMultiPages}</span></span>
-              <button onClick={() => setPageMulti(p => Math.min(totalMultiPages, p + 1))} disabled={pageMulti === totalMultiPages} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronRight size={20}/></button>
-            </div>
-          )}
-        </Card>
+        </div>
       </div>
-    </div>
-  </div>
-);
-};
+    );
+  };
 
   const renderMatchItem = (match) => {
     const isPending = match.status === 'pending';
@@ -757,7 +767,7 @@ export default function App() {
             const reward = isWinner ? match.rewardPerWinner : 0;
             return (
               <div key={id} className={`flex flex-col items-center gap-1.5 p-2 rounded-xl ${isWinner ? 'bg-amber-500/10' : ''}`}>
-                <div className="relative"><img src={player.avatar} className={`w-12 h-12 rounded-full border-2 object-cover ${isWinner ? 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'border-slate-600'}`} />{isWinner && <Crown size={16} className="absolute -top-2 -right-1 text-amber-400 rotate-12" />}</div>
+                <div className="relative"><img src={player.avatar} className={`w-12 h-12 rounded-full border-2 object-cover bg-slate-900 ${isWinner ? 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'border-slate-600'}`} />{isWinner && <Crown size={16} className="absolute -top-2 -right-1 text-amber-400 rotate-12" />}</div>
                 <span className={`text-xs ${isWinner ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>{player.name}</span>
                 {!isPending && <span className="text-[10px] font-mono font-bold text-amber-400">{isWinner ? `+${reward}C` : `0C`}</span>}
               </div>
@@ -824,7 +834,7 @@ export default function App() {
                   <h3 className="text-xl font-bold text-white">{schedule.title} {isFull && <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-md">마감</span>}</h3>
                   <div className="flex gap-4 text-sm text-slate-300"><div><Clock size={16} className="inline text-amber-400"/> {schedule.time}</div><div><MapPin size={16} className="inline text-amber-400"/> {schedule.location}</div></div>
                   <div className="flex flex-wrap gap-2 pt-2">
-                    {attendeesList.map(id => <img key={id} src={userMap[id]?.avatar} className="w-8 h-8 rounded-full border border-slate-600 object-cover" title={userMap[id]?.name} />)}
+                    {attendeesList.map(id => <img key={id} src={userMap[id]?.avatar} className="w-8 h-8 rounded-full border border-slate-600 object-cover bg-slate-800" title={userMap[id]?.name} />)}
                     {attendeesList.length === 0 && <span className="text-xs text-slate-600">아직 참석자가 없습니다.</span>}
                   </div>
                 </div>
@@ -844,17 +854,24 @@ export default function App() {
     <div className="min-h-screen bg-[#0a0f1c] text-slate-200 font-sans selection:bg-amber-500/30">
       {rankingAlert && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-900 px-6 py-3 rounded-full font-bold shadow-lg animate-in slide-in-from-top-4 fade-in duration-300">{rankingAlert}</div>}
 
+      {/* 내 프로필 수정 모달 */}
       {showProfileEdit && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-white"><Edit3 size={20} className="inline text-amber-400"/> 프로필 수정</h3><button onClick={() => setShowProfileEdit(false)} className="text-slate-400"><X size={24} /></button></div>
             <div className="space-y-4">
-              <div className="flex justify-center mb-4"><img src={profileEditData.avatar} className="w-20 h-20 rounded-full border-2 border-amber-500 shadow-lg object-cover" /></div>
+              <div className="flex justify-center mb-4"><img src={profileEditData.avatar} className="w-20 h-20 rounded-full border-2 border-amber-500 shadow-lg object-cover bg-slate-900" /></div>
               <div>
                 <label className="block text-sm text-slate-300 mb-1 font-bold">프로필 사진 첨부</label>
-                <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-900/50 hover:bg-slate-800 transition-colors">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6"><ImagePlus size={24} className="text-slate-400 mb-1" /><p className="text-xs text-slate-400">클릭하여 파일 선택</p></div>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                <label className={`flex flex-col items-center justify-center w-full h-20 border-2 border-slate-700 border-dashed rounded-xl ${isUploading ? 'bg-slate-800 cursor-not-allowed' : 'cursor-pointer bg-slate-900/50 hover:bg-slate-800'} transition-colors`}>
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {isUploading ? (
+                      <span className="text-amber-400 font-bold text-xs animate-pulse">사진 압축 및 처리중...</span>
+                    ) : (
+                      <><ImagePlus size={24} className="text-slate-400 mb-1" /><p className="text-xs text-slate-400">클릭하여 파일 선택 (자동 리사이징 적용)</p></>
+                    )}
+                  </div>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
                 </label>
               </div>
               <div><label className="block text-sm text-slate-300 mb-1">닉네임</label><input type="text" value={profileEditData.name} onChange={e => setProfileEditData({...profileEditData, name: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none" /></div>
@@ -862,7 +879,7 @@ export default function App() {
                 <div className="flex-1"><label className="block text-sm text-slate-300 mb-1">학과</label><input type="text" value={profileEditData.department} onChange={e => setProfileEditData({...profileEditData, department: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none" /></div>
                 <div className="w-1/3"><label className="block text-sm text-slate-300 mb-1">입학 학년</label><input type="number" value={profileEditData.year} onChange={e => setProfileEditData({...profileEditData, year: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none" /></div>
               </div>
-              <Button className="w-full mt-4 py-3" onClick={saveProfileEdit}>저장 및 적용</Button>
+              <Button className="w-full mt-4 py-3" onClick={saveProfileEdit} disabled={isUploading}>저장 및 적용</Button>
             </div>
           </div>
         </div>
@@ -897,6 +914,7 @@ export default function App() {
         </div>
       )}
 
+      {/* 관리자 패널 */}
       {showAdminPanel && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-red-500/50 rounded-2xl p-6 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative">
@@ -970,7 +988,7 @@ export default function App() {
                     <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-4">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
-                          <img src={userMap[adminSelectedUser].avatar} className="w-12 h-12 rounded-full border-2 border-slate-600 object-cover" alt="avatar"/>
+                          <img src={userMap[adminSelectedUser].avatar} className="w-12 h-12 rounded-full border-2 border-slate-600 object-cover bg-slate-900" alt="avatar"/>
                           <div>
                             <h4 className="font-bold text-white text-lg flex items-center gap-2">
                               {userMap[adminSelectedUser].name} 
@@ -1047,15 +1065,15 @@ export default function App() {
             {adminTab === 'settings' && (
               <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar pr-2">
                 <div>
-                  <h4 className="font-bold text-white mb-3">앱 로고 변경</h4>
+                  <h4 className="font-bold text-white mb-3">전체 앱 로고 변경 (서버 동기화)</h4>
                   <div className="bg-slate-800 p-6 rounded-xl border border-slate-700/50 flex flex-col items-center gap-4">
-                    <img src={appLogo} className="w-32 h-32 rounded-2xl object-cover object-center shadow-lg" alt="Current Logo"/>
-                    <label className="cursor-pointer bg-slate-900 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded-xl text-sm font-bold text-slate-300 transition-colors">
-                      새 로고 이미지 첨부
-                      <input type="file" className="hidden" accept="image/*" onChange={handleAppLogoUpload} />
+                    <img src={appLogo} className="w-32 h-32 rounded-2xl object-cover object-center shadow-lg bg-slate-900" alt="Current Logo"/>
+                    <label className={`cursor-pointer border px-4 py-2 rounded-xl text-sm font-bold transition-colors ${isUploading ? 'bg-slate-700 border-slate-600 text-slate-400' : 'bg-slate-900 hover:bg-slate-700 border-slate-600 text-slate-300'}`}>
+                      {isUploading ? '로고 처리 및 서버 업로드 중...' : '새 로고 이미지 서버에 등록'}
+                      <input type="file" className="hidden" accept="image/*" onChange={handleAppLogoUpload} disabled={isUploading} />
                     </label>
-                    <p className="text-xs text-slate-500 text-center">1:1 비율의 이미지를 권장합니다.<br/>첨부 시 빈틈없이 꽉 차게 조절됩니다.</p>
-                    <Button variant="outline" className="mt-2 text-xs py-1.5 border-slate-600 text-slate-400 hover:text-white hover:border-slate-400" onClick={() => setAppLogo('ChatGPT Image 2026년 5월 14일 오후 03_23_55.png')}>기본 로고로 복원</Button>
+                    <p className="text-xs text-slate-500 text-center">모든 사용자 화면의 로고가 즉시 바뀝니다.<br/>자동으로 적절한 크기로 압축되어 데이터베이스에 저장됩니다.</p>
+                    <Button variant="outline" className="mt-2 text-xs py-1.5 border-slate-600 text-slate-400 hover:text-white hover:border-slate-400" onClick={restoreDefaultLogo} disabled={isUploading}>기본 로고로 복원</Button>
                   </div>
                 </div>
               </div>
@@ -1072,7 +1090,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3 mb-6 max-h-60 overflow-y-auto">
               {resolveMatchData.playerIds?.map(id => {
                 const isSelected = resolveWinners.includes(id);
-                return <button key={id} onClick={() => {setResolveWinners(prev => prev.includes(id) ? prev.filter(w=>w!==id) : [...prev, id])}} className={`p-3 rounded-xl border-2 flex items-center gap-3 ${isSelected ? 'border-amber-500 bg-amber-500/20 text-amber-400' : 'border-slate-700 bg-slate-900 text-slate-300'}`}><img src={userMap[id]?.avatar} className="w-8 h-8 rounded-full object-cover" />{userMap[id]?.name}</button>;
+                return <button key={id} onClick={() => {setResolveWinners(prev => prev.includes(id) ? prev.filter(w=>w!==id) : [...prev, id])}} className={`p-3 rounded-xl border-2 flex items-center gap-3 ${isSelected ? 'border-amber-500 bg-amber-500/20 text-amber-400' : 'border-slate-700 bg-slate-900 text-slate-300'}`}><img src={userMap[id]?.avatar} className="w-8 h-8 rounded-full object-cover bg-slate-800" />{userMap[id]?.name}</button>;
               })}
             </div>
             <Button className="w-full" onClick={confirmMatchResolve} disabled={resolveWinners.length === 0}>결과 확정 및 분배</Button>
@@ -1101,10 +1119,11 @@ export default function App() {
         </div>
       )}
 
+      {/* 메인 레이아웃 */}
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row min-h-screen">
         <aside className="hidden md:flex flex-col w-64 border-r border-slate-800 p-6 sticky top-0 h-screen bg-[#0a0f1c]/80 backdrop-blur-xl">
           <div onClick={handleLogoClick} className="flex items-center gap-3 mb-12 text-amber-400 cursor-pointer select-none">
-            <img src={appLogo} className="w-14 h-14 rounded-xl object-cover object-center shadow-lg shadow-amber-500/10" />
+            <img src={appLogo} className="w-14 h-14 rounded-xl object-cover object-center shadow-lg shadow-amber-500/10 bg-slate-900" />
             <span className="text-2xl font-black">Avalon</span>
           </div>
           <nav className="flex-1 space-y-2">
@@ -1115,7 +1134,7 @@ export default function App() {
           <div className="mt-auto pt-6 border-t border-slate-800">
             <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 hover:bg-slate-800 transition-colors">
               <div onClick={openProfileEdit} className="flex items-center gap-3 cursor-pointer flex-1 overflow-hidden">
-                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-slate-600 object-cover shrink-0" />
+                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-slate-600 object-cover shrink-0 bg-slate-900" />
                 <div className="overflow-hidden">
                   <div className="text-sm font-bold text-white truncate">{currentUser.name}</div>
                   <div className="text-xs text-amber-400 font-mono font-bold flex items-center gap-1 mt-0.5"><Coins size={12} /> {(currentUser.coins || 0).toLocaleString()} C</div>
@@ -1130,7 +1149,7 @@ export default function App() {
 
         <header className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-[#0a0f1c]/90 sticky top-0 z-50">
           <div onClick={handleLogoClick} className="flex items-center gap-2 text-amber-400">
-            <img src={appLogo} className="w-10 h-10 rounded-lg object-cover object-center" />
+            <img src={appLogo} className="w-10 h-10 rounded-lg object-cover object-center bg-slate-900" />
             <span className="font-black text-lg">Avalon</span>
           </div>
           <div className="flex items-center gap-3">
