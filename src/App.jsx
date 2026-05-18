@@ -5,13 +5,12 @@ import {
   ChevronRight, Plus, CheckCircle2, ChevronLeft,
   Settings, Clock, MapPin, X, AlertTriangle, Users, User, Search,
   ShieldAlert, History, ArrowUpCircle, ArrowDownCircle,
-  LogOut, UserCircle, KeyRound, BookOpen, GraduationCap, BadgeInfo, Edit3, ImagePlus, Check, Trash2, Edit2
+  LogOut, UserCircle, KeyRound, BookOpen, GraduationCap, BadgeInfo, Edit3, ImagePlus, Check, Trash2
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
 import { 
-  getFirestore, collection, onSnapshot, doc, 
-  setDoc, updateDoc, deleteDoc, getDocs, query
+  getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -27,6 +26,41 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+const compressImage = (file) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+      };
+    };
+  });
+};
+
 const INITIAL_USERS = [
   { id: 'u1', username: 'admin', password: '1234', department: '컴퓨터공학과', year: 3, joinYear: 2026, realName: '김보드', name: '보드마스터', coins: 15000, avatar: 'https://i.pravatar.cc/150?u=u1', role: 'admin' },
   { id: 'u2', username: 'user1', password: '1234', department: '경영학과', year: 2, joinYear: 2026, realName: '이전략', name: '전략의신', coins: 12500, avatar: 'https://i.pravatar.cc/150?u=u2', role: 'user' },
@@ -36,22 +70,30 @@ const INITIAL_USERS = [
 ];
 
 const INITIAL_TOURNAMENTS = [
-  { id: 't1', title: '2026 스프링 챔피언십 (코인 쟁탈전)', description: '최고의 보드게임 전략가들이 모여 코인을 쟁취하는 대규모 토너먼트입니다. 패배를 두려워하지 마세요!', startDate: '2026-05-01', endDate: '2026-05-31', status: 'active', weeklyCoin: 1000, payoutDay: '월' }
+  { 
+    id: 't1', 
+    title: '2026 스프링 챔피언십 (코인 쟁탈전)', 
+    description: '최고의 보드게임 전략가들이 모여 코인을 쟁취하는 대규모 토너먼트입니다. 패배를 두려워하지 마세요!',
+    startDate: '2026-05-01', 
+    endDate: '2026-05-31',
+    status: 'active',
+    payoutMessage: '매주 화요일 모든 유저에게 1,000C 지급!'
+  }
 ];
 
+const now = Date.now();
 const INITIAL_MATCHES = [
-  { id: 'm1', tId: 't1', type: '1v1', gameTitle: '테라포밍 마스', playerIds: ['u1', 'u2'], bet: 1000, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 1 },
-  { id: 'm2', tId: 't1', type: 'multi', gameTitle: '아발론', playerIds: ['u1', 'u3', 'u4'], bet: 500, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 2 },
-  { id: 'm3', tId: 't1', type: '1v1', gameTitle: '스플렌더', playerIds: ['u3', 'u4'], bet: 300, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 3 },
-  { id: 'm4', tId: 't1', type: '1v1', gameTitle: '세븐 원더스', playerIds: ['u2', 'u5'], bet: 800, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 4 },
-  { id: 'm5', tId: 't1', type: '1v1', gameTitle: '카탄', playerIds: ['u1', 'u5'], bet: 600, status: 'completed', winners: ['u1'], rewardPerWinner: 1200, createdAt: 5 },
+  { id: 'm1', tId: 't1', type: '1v1', gameTitle: '테라포밍 마스', playerIds: ['u1', 'u2'], bet: 1000, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: now - 50000 },
+  { id: 'm2', tId: 't1', type: 'multi', gameTitle: '아발론', playerIds: ['u1', 'u3', 'u4'], bet: 500, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: now - 40000 },
+  { id: 'm3', tId: 't1', type: '1v1', gameTitle: '스플렌더', playerIds: ['u3', 'u4'], bet: 300, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: now - 30000 },
+  { id: 'm4', tId: 't1', type: '1v1', gameTitle: '세븐 원더스', playerIds: ['u2', 'u5'], bet: 800, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: now - 20000 },
+  { id: 'm5', tId: 't1', type: '1v1', gameTitle: '카탄', playerIds: ['u1', 'u5'], bet: 600, status: 'completed', winners: ['u1'], rewardPerWinner: 1200, createdAt: now - 10000 },
 ];
 
 const WEEK_DAYS = ['월', '화', '수', '목', '금', '토', '일'];
-
-const DEFAULT_LOGO = 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=300&auto=format&fit=crop';
-const DEFAULT_HOF_TITLE = "명예의 전당";
-const DEFAULT_HOF_SUBTITLE = "최고의 보드게임 마스터를 향한 위대한 여정";
+const DEFAULT_LOGO = 'https://picsum.photos/seed/avalon/150/150';
+const DEFAULT_HOF_TITLE = '명예의 전당';
+const DEFAULT_HOF_SUBTITLE = '최고의 보드게임 마스터를 향한 위대한 여정';
 
 const toLocalDateString = (date) => {
   const year = date.getFullYear();
@@ -65,35 +107,6 @@ const getDisplayYear = (yearNum, joinYear) => {
   const baseYear = joinYear || currentYear;
   const calculatedYear = Number(yearNum) + (currentYear - baseYear);
   return calculatedYear >= 5 ? 'N학년' : `${calculatedYear}학년`;
-};
-
-// 이미지 용량 최적화 및 리사이징 엔진 (Firestore 1MB 한계 극복용)
-const compressImage = (file, maxSize = 300) => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxSize) { height *= maxSize / width; width = maxSize; }
-        } else {
-          if (height > maxSize) { width *= maxSize / height; height = maxSize; }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
-      };
-    };
-  });
 };
 
 const Card = ({ children, className = '' }) => (
@@ -124,11 +137,18 @@ export default function App() {
   const [schedules, setSchedules] = useState([]);
   const [coinHistory, setCoinHistory] = useState([]);
 
-  // 앱 설정 관련 상태 (로고 및 명예의 전당 텍스트)
+  // App Settings States
   const [appLogo, setAppLogo] = useState(DEFAULT_LOGO);
   const [hofTitle, setHofTitle] = useState(DEFAULT_HOF_TITLE);
   const [hofSubtitle, setHofSubtitle] = useState(DEFAULT_HOF_SUBTITLE);
+  const [defaultStartingCoin, setDefaultStartingCoin] = useState(3000);
+  
+  const [isEditingHof, setIsEditingHof] = useState(false);
+  const [editHofData, setEditHofData] = useState({ title: '', subtitle: '' });
 
+  const [matchTab, setMatchTab] = useState('1v1'); // '1v1' | 'multi'
+
+  // Auth States
   const [loggedInUserId, setLoggedInUserId] = useState(() => localStorage.getItem('avalon_loggedInUserId') || null);
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('avalon_loggedInUserId'));
   const [rankingAlert, setRankingAlert] = useState('');
@@ -142,10 +162,10 @@ export default function App() {
 
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [profileEditData, setProfileEditData] = useState({ name: '', department: '', year: '', avatar: '' });
-  const [isUploading, setIsUploading] = useState(false);
 
   const [currentView, setCurrentView] = useState('home');
   
+  // Schedule States
   const [currentWeekBaseDate, setCurrentWeekBaseDate] = useState(() => {
     const today = new Date();
     const day = today.getDay();
@@ -154,10 +174,12 @@ export default function App() {
   });
   const [weekOffset, setWeekOffset] = useState(0); 
   const [selectedDateObj, setSelectedDateObj] = useState(new Date());
-
   const [showAddSchedule, setShowAddSchedule] = useState(false);
-  const [newScheduleData, setNewScheduleData] = useState({ title: '새로운 정기 모임', date: toLocalDateString(new Date()), time: '19:00', location: '아발론 동아리방', maxAttendees: 11 });
+  const [newScheduleData, setNewScheduleData] = useState({
+    title: '새로운 정기 모임', date: toLocalDateString(new Date()), time: '19:00', location: '아발론 동아리방', maxAttendees: 11
+  });
 
+  // Match States
   const [showTournamentSettings, setShowTournamentSettings] = useState(false);
   const [editTournamentData, setEditTournamentData] = useState(null);
   
@@ -176,14 +198,11 @@ export default function App() {
   const [resolveMatchData, setResolveMatchData] = useState(null); 
   const [resolveWinners, setResolveWinners] = useState([]);
 
-  // 관리자 전용 팝업 상태들
-  const [showHofEditModal, setShowHofEditModal] = useState(false);
-  const [hofEditData, setHofEditData] = useState({ title: '', subtitle: '' });
-
+  // Match Edit/Delete States
+  const [editingMatchData, setEditingMatchData] = useState(null);
   const [matchToDelete, setMatchToDelete] = useState(null);
-  const [matchToEdit, setMatchToEdit] = useState(null);
-  const [editMatchTitle, setEditMatchTitle] = useState('');
   
+  // Admin States
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [logoClicks, setLogoClicks] = useState(0);
   const clickTimeoutRef = useRef(null);
@@ -194,58 +213,65 @@ export default function App() {
   const [adminCoinAmount, setAdminCoinAmount] = useState('');
   const [adminCoinReason, setAdminCoinReason] = useState('');
   const [userToDelete, setUserToDelete] = useState(null);
+  const [adminStartingCoin, setAdminStartingCoin] = useState(3000);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    // 1. App Settings (Global Logo & HOF Text Sync)
+    // 1. Settings (Global Logo, HOF Text, Default Coins)
     const unsubSettings = onSnapshot(doc(db, "settings", "appInfo"), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setAppLogo(data.logo || DEFAULT_LOGO);
         setHofTitle(data.hofTitle || DEFAULT_HOF_TITLE);
         setHofSubtitle(data.hofSubtitle || DEFAULT_HOF_SUBTITLE);
+        setDefaultStartingCoin(data.defaultStartingCoin ?? 3000);
+        setAdminStartingCoin(data.defaultStartingCoin ?? 3000);
       } else {
-        setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO, hofTitle: DEFAULT_HOF_TITLE, hofSubtitle: DEFAULT_HOF_SUBTITLE });
+        setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO, hofTitle: DEFAULT_HOF_TITLE, hofSubtitle: DEFAULT_HOF_SUBTITLE, defaultStartingCoin: 3000 });
       }
     }, (error) => console.error(error));
 
-    // 2. 유저 정보
+    // 2. Users Sync
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
       if (snapshot.empty) {
-        INITIAL_USERS.forEach(async (u) => { await setDoc(doc(db, "users", u.id), u); });
+        INITIAL_USERS.forEach(async (u) => {
+          await setDoc(doc(db, "users", u.id), u);
+        });
       } else {
-        setUsers(snapshot.docs.map(doc => doc.data()));
+        const list = snapshot.docs.map(doc => doc.data());
+        setUsers(list);
       }
     }, (error) => console.error(error));
 
-    // 3. 대회 현황
+    // 3. Tournaments Sync
     const unsubTournaments = onSnapshot(collection(db, "tournaments"), (snapshot) => {
       if (snapshot.empty) {
-        INITIAL_TOURNAMENTS.forEach(async (t) => { await setDoc(doc(db, "tournaments", t.id), t); });
+        INITIAL_TOURNAMENTS.forEach(async (t) => {
+          await setDoc(doc(db, "tournaments", t.id), t);
+        });
       } else {
         setTournaments(snapshot.docs.map(doc => doc.data()));
       }
     }, (error) => console.error(error));
 
-    // 4. 매치 내역 (★ createdAt 기준으로 정렬하여 최신 매치가 무조건 1페이지 상단에 오도록 수정)
+    // 4. Matches Sync (Sorted by createdAt)
     const unsubMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
       if (snapshot.empty && users.length > 0) {
-        INITIAL_MATCHES.forEach(async (m) => { await setDoc(doc(db, "matches", m.id), m); });
+        INITIAL_MATCHES.forEach(async (m) => {
+          await setDoc(doc(db, "matches", m.id), m);
+        });
       } else {
         const list = snapshot.docs.map(doc => doc.data());
-        setMatches(list.sort((a, b) => {
-          const timeA = a.createdAt || 0;
-          const timeB = b.createdAt || 0;
-          return timeB - timeA; // 내림차순 정렬 (최신이 먼저)
-        }));
+        setMatches(list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
       }
     }, (error) => console.error(error));
 
-    // 5. 모임 일정
+    // 5. Schedules Sync
     const unsubSchedules = onSnapshot(collection(db, "schedules"), (snapshot) => {
       setSchedules(snapshot.docs.map(doc => doc.data()));
     }, (error) => console.error(error));
 
-    // 6. 코인 장부
+    // 6. Coin History Sync
     const unsubHistory = onSnapshot(collection(db, "coinHistory"), (snapshot) => {
       const list = snapshot.docs.map(doc => doc.data());
       setCoinHistory(list.sort((a, b) => b.id.localeCompare(a.id)));
@@ -299,12 +325,10 @@ export default function App() {
   useEffect(() => {
     if (users.length === 0) return;
     const baseDate = new Date(currentWeekBaseDate);
-    
     for (let i = 0; i < 14; i++) {
       const date = new Date(baseDate);
       date.setDate(date.getDate() + i);
       const dateString = toLocalDateString(date);
-      
       if (!schedules.find(s => s.date === dateString && s.isAuto)) {
         const autoSche = {
           id: `auto_${dateString}`, title: '정규 모임', date: dateString, time: '19:00 ~ 23:00',
@@ -341,7 +365,7 @@ export default function App() {
     
     const newUser = {
       id: `u${Date.now()}`, username, password, department, year: Number(year), joinYear: new Date().getFullYear(),
-      realName, name: nickname, coins: 3000, avatar: `https://i.pravatar.cc/150?u=${username}`, role: 'user'
+      realName, name: nickname, coins: defaultStartingCoin, avatar: `https://i.pravatar.cc/150?u=${username}`, role: 'user'
     };
     
     await setDoc(doc(db, "users", newUser.id), newUser);
@@ -363,50 +387,26 @@ export default function App() {
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setIsUploading(true);
-      try {
-        const compressedBase64 = await compressImage(file, 200); 
-        setProfileEditData({ ...profileEditData, avatar: compressedBase64 });
-      } catch (err) {
-        console.error("이미지 처리 실패:", err);
-      } finally {
-        setIsUploading(false);
-      }
+      const compressedDataUrl = await compressImage(file);
+      setProfileEditData({ ...profileEditData, avatar: compressedDataUrl });
     }
-  };
-
-  const saveProfileEdit = async () => {
-    await updateDoc(doc(db, "users", currentUser.id), {
-      name: profileEditData.name,
-      department: profileEditData.department,
-      year: Number(profileEditData.year),
-      avatar: profileEditData.avatar
-    });
-    setShowProfileEdit(false);
   };
 
   const handleAppLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setIsUploading(true);
-      try {
-        const compressedBase64 = await compressImage(file, 400); 
-        await setDoc(doc(db, "settings", "appInfo"), { logo: compressedBase64 }, { merge: true });
-      } catch (err) {
-        console.error("로고 업로드 실패:", err);
-      } finally {
-        setIsUploading(false);
-      }
+      const compressedDataUrl = await compressImage(file);
+      await setDoc(doc(db, "settings", "appInfo"), { logo: compressedDataUrl }, { merge: true });
+      setIsUploading(false);
     }
   };
-  
-  const restoreDefaultLogo = async () => {
-    await setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO }, { merge: true });
-  };
 
-  const handleSaveHofText = async () => {
-    await setDoc(doc(db, "settings", "appInfo"), { hofTitle: hofEditData.title, hofSubtitle: hofEditData.subtitle }, { merge: true });
-    setShowHofEditModal(false);
+  const saveProfileEdit = async () => {
+    await updateDoc(doc(db, "users", currentUser.id), {
+      name: profileEditData.name, department: profileEditData.department, year: Number(profileEditData.year), avatar: profileEditData.avatar
+    });
+    setShowProfileEdit(false);
   };
 
   const handleLogoClick = () => {
@@ -435,16 +435,12 @@ export default function App() {
 
   const confirmDeleteUser = async () => {
     if (!userToDelete || userToDelete === currentUser.id) return; 
-    
     await deleteDoc(doc(db, "users", userToDelete));
     schedules.forEach(async (s) => {
       if (s.attendees.includes(userToDelete)) {
-        await updateDoc(doc(db, "schedules", s.id), {
-          attendees: s.attendees.filter(id => id !== userToDelete)
-        });
+        await updateDoc(doc(db, "schedules", s.id), { attendees: s.attendees.filter(id => id !== userToDelete) });
       }
     });
-
     if (adminSelectedUser === userToDelete) setAdminSelectedUser('ALL');
     setUserToDelete(null);
   };
@@ -461,9 +457,7 @@ export default function App() {
         await updateDoc(doc(db, "users", u.id), { coins: nextCoin });
       });
       const logId = `h_${Date.now()}_global`;
-      await setDoc(doc(db, "coinHistory", logId), {
-        id: logId, userId: 'ALL', amount: finalAmount, desc: `[전체 일괄] ${desc}`, date: new Date().toLocaleString('ko-KR')
-      });
+      await setDoc(doc(db, "coinHistory", logId), { id: logId, userId: 'ALL', amount: finalAmount, desc: `[전체 일괄] ${desc}`, date: new Date().toLocaleString('ko-KR') });
     } else {
       const targetUser = userMap[adminSelectedUser];
       if (!targetUser) return;
@@ -477,7 +471,6 @@ export default function App() {
   const handleCreate1v1Match = async () => {
     const betNum = Number(betAmount1v1);
     if (!gameTitle1v1 || !selectedOpponent1v1 || betNum <= 0) return;
-    
     const players = [currentUser.id, selectedOpponent1v1];
     const insufficient = players.find(id => (userMap[id]?.coins || 0) < betNum);
     if (insufficient) {
@@ -485,7 +478,6 @@ export default function App() {
       setTimeout(() => setRankingAlert(''), 3000);
       return;
     }
-    
     const matchId = `m${Date.now()}`;
     const newMatch = { id: matchId, tId: tournaments[0].id, type: '1v1', gameTitle: gameTitle1v1, playerIds: players, bet: betNum, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: Date.now() };
     
@@ -503,7 +495,6 @@ export default function App() {
   const handleCreateMultiMatch = async () => {
     const betNum = Number(betAmountMulti);
     if (!gameTitleMulti || selectedOpponentsMulti.length === 0 || betNum <= 0) return;
-    
     const players = [currentUser.id, ...selectedOpponentsMulti];
     const insufficient = players.find(id => (userMap[id]?.coins || 0) < betNum);
     if (insufficient) {
@@ -511,7 +502,6 @@ export default function App() {
       setTimeout(() => setRankingAlert(''), 3000);
       return;
     }
-    
     const matchId = `m${Date.now()}`;
     const newMatch = { id: matchId, tId: tournaments[0].id, type: 'multi', gameTitle: gameTitleMulti, playerIds: players, bet: betNum, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: Date.now() };
     
@@ -526,35 +516,18 @@ export default function App() {
     setPageMulti(1);
   };
 
-  // 관리자 기능: 매치 삭제 (환불 처리 포함)
   const confirmDeleteMatch = async () => {
-    if (!matchToDelete) return;
-    const match = matchToDelete;
-    
-    // 아직 분배되지 않은 매치라면 베팅했던 코인 환불
-    if (match.status === 'pending') {
-      match.playerIds?.forEach(async (id) => {
-        const targetUser = userMap[id];
-        if (targetUser) {
-          await updateDoc(doc(db, "users", id), { coins: (targetUser.coins || 0) + match.bet });
-          await logCoinHistory(id, match.bet, `[${match.gameTitle}] 관리자 매치 삭제 (베팅 환불)`);
-        }
+    if(!matchToDelete) return;
+    if (matchToDelete.status === 'pending') {
+      matchToDelete.playerIds.forEach(async (id) => {
+        const currentCoin = userMap[id]?.coins || 0;
+        await updateDoc(doc(db, "users", id), { coins: currentCoin + matchToDelete.bet });
+        await logCoinHistory(id, matchToDelete.bet, `[${matchToDelete.gameTitle}] 매치 취소 환불`);
       });
     }
-    
-    await deleteDoc(doc(db, "matches", match.id));
+    await deleteDoc(doc(db, "matches", matchToDelete.id));
     setMatchToDelete(null);
   };
-
-  // 관리자 기능: 매치 제목 수정
-  const handleEditMatchTitle = async () => {
-    if (!matchToEdit || !editMatchTitle) return;
-    await updateDoc(doc(db, "matches", matchToEdit.id), { gameTitle: editMatchTitle });
-    setMatchToEdit(null);
-    setEditMatchTitle('');
-  };
-
-  const toggleMultiOpponent = (id) => setSelectedOpponentsMulti(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
 
   const confirmMatchResolve = async () => {
     if (!resolveMatchData || resolveWinners.length === 0) return;
@@ -562,18 +535,12 @@ export default function App() {
     const totalPot = match.bet * match.playerIds.length;
     const rewardPerWinner = Math.floor(totalPot / resolveWinners.length);
 
-    await updateDoc(doc(db, "matches", match.id), {
-      status: 'completed',
-      winners: resolveWinners,
-      rewardPerWinner
-    });
-    
+    await updateDoc(doc(db, "matches", match.id), { status: 'completed', winners: resolveWinners, rewardPerWinner });
     resolveWinners.forEach(async (wId) => {
       const currentCoin = userMap[wId]?.coins || 0;
       await updateDoc(doc(db, "users", wId), { coins: currentCoin + rewardPerWinner });
       await logCoinHistory(wId, rewardPerWinner, `[${match.gameTitle}] 승리 배당 보상`);
     });
-    
     setResolveMatchData(null); setResolveWinners([]);
   };
 
@@ -590,7 +557,7 @@ export default function App() {
       <div className="min-h-screen bg-[#0a0f1c] flex flex-col items-center justify-center p-4 selection:bg-amber-500/30 font-sans relative overflow-hidden">
         <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/50 p-8 rounded-3xl w-full max-w-md shadow-2xl relative z-10">
           <div className="flex flex-col items-center mb-8">
-            <img src={appLogo} alt="Avalon" className="w-24 h-24 rounded-2xl object-cover object-center shadow-lg shadow-amber-500/20 mb-4 bg-slate-900" />
+            <img src={appLogo} alt="Avalon" className="w-24 h-24 rounded-2xl object-cover object-center shadow-lg shadow-amber-500/20 mb-4" />
             <h1 className="text-3xl font-black text-white tracking-tight">AVALON</h1>
           </div>
           {authError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-xl mb-6 text-center">{authError}</div>}
@@ -632,6 +599,39 @@ export default function App() {
     );
   };
 
+  const renderMatchItem = (match) => {
+    const isPending = match.status === 'pending';
+    const totalPot = match.bet * (match.playerIds?.length || 1);
+    return (
+      <div key={match.id} className={`bg-slate-900/50 border ${isPending ? 'border-amber-500/20' : 'border-slate-700/50 opacity-80'} rounded-xl p-4 flex flex-col gap-4 relative group`}>
+        {currentUser.role === 'admin' && (
+          <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <button onClick={() => setEditingMatchData(match)} className="p-1.5 text-slate-400 hover:text-amber-400 bg-slate-800 rounded-md border border-slate-700"><Edit3 size={14}/></button>
+            <button onClick={() => setMatchToDelete(match)} className="p-1.5 text-slate-400 hover:text-red-400 bg-slate-800 rounded-md border border-slate-700"><Trash2 size={14}/></button>
+          </div>
+        )}
+        <div className={`flex justify-between items-center border-b border-slate-800 pb-3 ${currentUser.role === 'admin' ? 'pr-16' : ''}`}>
+          <div><h4 className="text-white font-bold text-lg mb-1">{match.gameTitle || '미지정 게임'}</h4><div className="bg-slate-800 text-amber-400 font-mono text-xs px-2 py-1 rounded border border-amber-500/20 inline-flex items-center gap-1"><Trophy size={12} /> 총 상금 {totalPot}C</div></div>
+          <div>{!isPending ? <div className="text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg border text-xs font-bold"><CheckCircle2 size={14} className="inline"/> 분배 완료</div> : <Button variant="outline" className="py-1 px-3 text-xs" onClick={() => {setResolveMatchData(match); setResolveWinners([]);}}>승리자 선택</Button>}</div>
+        </div>
+        <div className="flex flex-wrap gap-4 items-center">
+          {match.playerIds?.map(id => {
+            const player = userMap[id] || { name: '알 수 없음', avatar: 'https://i.pravatar.cc/150?u=unknown' };
+            const isWinner = !isPending && match.winners?.includes(id);
+            const reward = isWinner ? match.rewardPerWinner : 0;
+            return (
+              <div key={id} className={`flex flex-col items-center gap-1.5 p-2 rounded-xl ${isWinner ? 'bg-amber-500/10' : ''}`}>
+                <div className="relative"><img src={player.avatar} className={`w-12 h-12 rounded-full border-2 object-cover ${isWinner ? 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'border-slate-600'}`} />{isWinner && <Crown size={16} className="absolute -top-2 -right-1 text-amber-400 rotate-12" />}</div>
+                <span className={`text-xs ${isWinner ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>{player.name}</span>
+                {!isPending && <span className="text-[10px] font-mono font-bold text-amber-400">{isWinner ? `+${reward}C` : `0C`}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const renderHome = () => (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 p-8 shadow-2xl group">
@@ -642,7 +642,7 @@ export default function App() {
             <p className="text-slate-400 text-lg">{hofSubtitle}</p>
           </div>
           {currentUser.role === 'admin' && (
-            <button onClick={() => {setHofEditData({title: hofTitle, subtitle: hofSubtitle}); setShowHofEditModal(true);}} className="p-2 bg-slate-800 border border-slate-600 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100">
+            <button onClick={() => { setEditHofData({ title: hofTitle, subtitle: hofSubtitle }); setIsEditingHof(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-slate-800/80 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-amber-400 border border-slate-600/50">
               <Edit3 size={18} />
             </button>
           )}
@@ -655,7 +655,7 @@ export default function App() {
             <div key={user.id} className={`flex items-center justify-between p-4 rounded-xl transition-all ${index === 0 ? 'bg-gradient-to-r from-amber-500/20 border border-amber-500/30' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}>
               <div className="flex items-center gap-4">
                 <div className={`w-8 h-8 flex items-center justify-center font-bold text-lg rounded-full ${index === 0 ? 'bg-amber-400 text-slate-900 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : index === 1 ? 'bg-slate-300 text-slate-900' : index === 2 ? 'bg-amber-700 text-white' : 'text-slate-500'}`}>{index + 1}</div>
-                <img src={user.avatar} className="w-12 h-12 rounded-full border-2 border-slate-700 object-cover bg-slate-900" />
+                <img src={user.avatar} className="w-12 h-12 rounded-full border-2 border-slate-700 object-cover" />
                 <div><div className="font-bold text-white flex items-center gap-2">{user.name}{index === 0 && <Crown size={16} className="text-amber-400" />}</div></div>
               </div>
               <div className="flex items-center gap-2 font-mono text-lg font-bold text-amber-400"><Coins size={18} />{(user.coins || 0).toLocaleString()}</div>
@@ -668,7 +668,10 @@ export default function App() {
 
   const renderTournaments = () => {
     const activeTournament = tournaments[0] || INITIAL_TOURNAMENTS[0]; 
-    
+    const isTournamentEnded = new Date(activeTournament.endDate) < new Date(new Date().setHours(0,0,0,0));
+    const tournamentStatusLabel = isTournamentEnded ? '대회종료' : '진행중';
+    const tournamentStatusClass = isTournamentEnded ? 'bg-slate-600 text-slate-300' : 'bg-amber-500 text-slate-900';
+
     const allMatches1v1 = matches.filter(m => m.type === '1v1');
     const total1v1Pages = Math.ceil(allMatches1v1.length / 3);
     const displayedMatches1v1 = allMatches1v1.slice((page1v1 - 1) * 3, page1v1 * 3);
@@ -684,20 +687,20 @@ export default function App() {
 
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="bg-gradient-to-r from-amber-500/20 to-yellow-500/5 border border-amber-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div className={`bg-gradient-to-r ${isTournamentEnded ? 'from-slate-700/50 to-slate-800/50 border-slate-600' : 'from-amber-500/20 to-yellow-500/5 border-amber-500/30'} border rounded-2xl p-6 shadow-xl relative overflow-hidden`}>
           <div className="absolute top-1/2 -translate-y-1/2 right-4 opacity-20"><Trophy size={100} /></div>
           <div className="relative z-10 flex flex-col md:flex-row justify-between md:items-center gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="bg-amber-500 text-slate-900 text-xs font-bold px-2 py-1 rounded">진행중</span>
-                <span className="text-amber-400 font-bold">{activeTournament.title}</span>
+                <span className={`${tournamentStatusClass} text-xs font-bold px-2 py-1 rounded`}>{tournamentStatusLabel}</span>
+                <span className={`font-bold ${isTournamentEnded ? 'text-slate-300' : 'text-amber-400'}`}>{activeTournament.title}</span>
               </div>
               <h2 className="text-2xl font-black text-white mb-2">{activeTournament.startDate} ~ {activeTournament.endDate}</h2>
               {activeTournament.description && <p className="text-slate-200 mb-3 text-sm leading-relaxed max-w-xl">{activeTournament.description}</p>}
-              <p className="text-slate-400 text-sm font-medium">매주 <span className="font-bold text-amber-400">{activeTournament.payoutDay}요일</span> 모든 유저에게 <span className="font-bold text-amber-400 font-mono">{(activeTournament.weeklyCoin || 0).toLocaleString()}C</span> 지급!</p>
+              <p className="text-slate-400 text-sm font-medium"><span className="font-bold text-amber-400">{activeTournament.payoutMessage}</span></p>
             </div>
             {currentUser.role === 'admin' && (
-              <Button variant="outline" className="shrink-0 border-amber-500 text-amber-400 hover:bg-amber-500/20" onClick={() => { setEditTournamentData({ ...activeTournament }); setShowTournamentSettings(true); }}>
+              <Button variant="outline" className={`shrink-0 ${isTournamentEnded ? 'border-slate-500 text-slate-400 hover:bg-slate-700' : 'border-amber-500 text-amber-400 hover:bg-amber-500/20'}`} onClick={() => { setEditTournamentData({ ...activeTournament }); setShowTournamentSettings(true); }}>
                 <Settings size={16} /> 대회 기간/설정 관리
               </Button>
             )}
@@ -713,7 +716,7 @@ export default function App() {
                   <div className="text-sm font-bold text-amber-400 mb-1">{match.gameTitle || '미지정 게임'}</div>
                   <div className="text-xs text-slate-400 mb-2">{match.type === '1v1' ? '1대1 결투' : '다인원 매치'} • 총 {match.bet * (match.playerIds?.length || 1)}C</div>
                   <div className="flex -space-x-2">
-                    {match.playerIds?.map(id => <img key={id} src={userMap[id]?.avatar} className="w-6 h-6 rounded-full border-2 border-slate-800 object-cover bg-slate-900" title={userMap[id]?.name}/>)}
+                    {match.playerIds?.map(id => <img key={id} src={userMap[id]?.avatar} className="w-6 h-6 rounded-full border-2 border-slate-800 object-cover" title={userMap[id]?.name}/>)}
                   </div>
                 </div>
               ))}
@@ -721,115 +724,93 @@ export default function App() {
           </div>
         )}
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 border-b border-slate-800 pb-2"><User className="text-amber-400" size={24} /><h2 className="text-2xl font-bold text-white">1대1 결투 매치</h2></div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-1 h-fit bg-slate-800/80">
-              <h3 className="text-lg font-bold text-white mb-4">1대1 결투 신청</h3>
-              <div className="space-y-4">
-                <div><label className="block text-sm text-slate-300 mb-2">게임 제목</label><input type="text" value={gameTitle1v1} onChange={(e) => setGameTitle1v1(e.target.value)} placeholder="게임 이름을 입력하세요" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none" /></div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-2">상대방 검색 및 선택</label>
-                  <div className="relative mb-3"><input type="text" value={searchOpponent1v1} onChange={e => setSearchOpponent1v1(e.target.value)} placeholder="이름으로 찾기..." className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 pl-9 text-sm text-white focus:border-amber-500 outline-none" /><Search size={16} className="absolute left-3 top-3 text-slate-500" /></div>
-                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                    {searchFilteredUsers1v1.map(u => (
-                      <button key={u.id} onClick={() => setSelectedOpponent1v1(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponent1v1 === u.id ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover bg-slate-800" />{u.name}</button>
-                    ))}
-                    {searchFilteredUsers1v1.length === 0 && <div className="text-xs text-slate-500 w-full text-center">검색 결과가 없습니다.</div>}
-                  </div>
-                </div>
-                <div><label className="block text-sm text-slate-300 mb-2">비팅할 코인</label><div className="relative"><input type="number" value={betAmount1v1} onChange={(e) => setBetAmount1v1(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 pl-10 text-white focus:border-amber-500 outline-none" /><Coins size={18} className="absolute left-3 top-3.5 text-amber-500" /></div></div>
-                <Button className="w-full mt-2" onClick={handleCreate1v1Match} disabled={!gameTitle1v1 || !selectedOpponent1v1 || !betAmount1v1}><Swords size={18} /> 결투 시작</Button>
-              </div>
-            </Card>
-            
-            <Card className="lg:col-span-2 flex flex-col">
-              <div className="space-y-3 flex-1">
-                {displayedMatches1v1.length === 0 && <div className="text-center text-slate-500 py-10">생성된 매치가 없습니다.</div>}
-                {displayedMatches1v1.map(match => renderMatchItem(match))}
-              </div>
-              {total1v1Pages > 1 && (
-                <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-700/50">
-                  <button onClick={() => setPage1v1(p => Math.max(1, p - 1))} disabled={page1v1 === 1} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronLeft size={20}/></button>
-                  <span className="text-sm font-bold text-amber-400">{page1v1} <span className="text-slate-500">/ {total1v1Pages}</span></span>
-                  <button onClick={() => setPage1v1(p => Math.min(total1v1Pages, p + 1))} disabled={page1v1 === total1v1Pages} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronRight size={20}/></button>
-                </div>
-              )}
-            </Card>
-          </div>
+        <div className="flex bg-slate-800 p-1 rounded-xl w-full max-w-sm mx-auto mb-6">
+          <button onClick={() => setMatchTab('1v1')} className={`flex-1 py-2 font-bold rounded-lg transition-all ${matchTab === '1v1' ? 'bg-amber-500 text-slate-900 shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}>1대1 결투 매치</button>
+          <button onClick={() => setMatchTab('multi')} className={`flex-1 py-2 font-bold rounded-lg transition-all ${matchTab === 'multi' ? 'bg-amber-500 text-slate-900 shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}`}>다인원 코인 쟁탈전</button>
         </div>
 
-        <div className="space-y-4 pt-6">
-          <div className="flex items-center gap-3 border-b border-slate-800 pb-2"><Users className="text-amber-400" size={24} /><h2 className="text-2xl font-bold text-white">다인원 코인 쟁탈전</h2></div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-1 h-fit bg-slate-800/80">
-              <h3 className="text-lg font-bold text-white mb-4">다인원 매치 신청</h3>
-              <div className="space-y-4">
-                <div><label className="block text-sm text-slate-300 mb-2">게임 제목</label><input type="text" value={gameTitleMulti} onChange={(e) => setGameTitleMulti(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none" /></div>
-                <div>
-                  <label className="block text-sm text-slate-300 mb-2">상대방 검색 및 선택</label>
-                  <div className="relative mb-3"><input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 pl-9 text-sm text-white focus:border-amber-500 outline-none" /><Search size={16} className="absolute left-3 top-3 text-slate-500" /></div>
-                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                    {searchFilteredUsersMulti.map(u => (
-                      <button key={u.id} onClick={() => toggleMultiOpponent(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponentsMulti.includes(u.id) ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover bg-slate-800" />{u.name}</button>
-                    ))}
+        {matchTab === '1v1' && (
+          <div className="space-y-4 animate-in slide-in-from-left-4 fade-in duration-300">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-2"><User className="text-amber-400" size={24} /><h2 className="text-2xl font-bold text-white">1대1 결투 매치</h2></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-1 h-fit bg-slate-800/80">
+                <h3 className="text-lg font-bold text-white mb-4">1대1 결투 신청</h3>
+                <div className="space-y-4">
+                  <div><label className="block text-sm text-slate-300 mb-2">게임 제목</label><input type="text" value={gameTitle1v1} onChange={(e) => setGameTitle1v1(e.target.value)} placeholder="게임 이름을 입력하세요" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none" /></div>
+                  <div>
+                    <label className="block text-sm text-slate-300 mb-2">상대방 검색 및 선택</label>
+                    <div className="relative mb-3"><input type="text" value={searchOpponent1v1} onChange={e => setSearchOpponent1v1(e.target.value)} placeholder="이름으로 찾기..." className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 pl-9 text-sm text-white focus:border-amber-500 outline-none" /><Search size={16} className="absolute left-3 top-3 text-slate-500" /></div>
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                      {searchFilteredUsers1v1.map(u => (
+                        <button key={u.id} onClick={() => setSelectedOpponent1v1(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponent1v1 === u.id ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover" />{u.name}</button>
+                      ))}
+                      {searchFilteredUsers1v1.length === 0 && <div className="text-xs text-slate-500 w-full text-center">검색 결과가 없습니다.</div>}
+                    </div>
                   </div>
+                  <div><label className="block text-sm text-slate-300 mb-2">베팅할 코인</label><div className="relative"><input type="number" value={betAmount1v1} onChange={(e) => setBetAmount1v1(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 pl-10 text-white focus:border-amber-500 outline-none" /><Coins size={18} className="absolute left-3 top-3.5 text-amber-500" /></div></div>
+                  <Button className="w-full mt-2" onClick={handleCreate1v1Match} disabled={!gameTitle1v1 || !selectedOpponent1v1 || !betAmount1v1 || isTournamentEnded}><Swords size={18} /> 결투 시작</Button>
+                  {isTournamentEnded && <p className="text-xs text-red-400 text-center mt-2">대회가 종료되어 매치를 생성할 수 없습니다.</p>}
                 </div>
-                <div><label className="block text-sm text-slate-300 mb-2">1인당 베팅할 코인</label><div className="relative"><input type="number" value={betAmountMulti} onChange={(e) => setBetAmountMulti(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 pl-10 text-white focus:border-amber-500 outline-none" /><Coins size={18} className="absolute left-3 top-3.5 text-amber-500" /></div></div>
-                <Button className="w-full mt-2" onClick={handleCreateMultiMatch} disabled={!gameTitleMulti || selectedOpponentsMulti.length === 0 || !betAmountMulti}><Swords size={18} /> 다인원 시작</Button>
-              </div>
-            </Card>
-            <Card className="lg:col-span-2 flex flex-col">
-              <div className="space-y-3 flex-1">
-                {displayedMatchesMulti.length === 0 && <div className="text-center text-slate-500 py-10">생성된 다인원 매치가 없습니다.</div>}
-                {displayedMatchesMulti.map(match => renderMatchItem(match))}
-              </div>
-              {totalMultiPages > 1 && (
-                <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-700/50">
-                  <button onClick={() => setPageMulti(p => Math.max(1, p - 1))} disabled={pageMulti === 1} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronLeft size={20}/></button>
-                  <span className="text-sm font-bold text-amber-400">{pageMulti} <span className="text-slate-500">/ {totalMultiPages}</span></span>
-                  <button onClick={() => setPageMulti(p => Math.min(totalMultiPages, p + 1))} disabled={pageMulti === totalMultiPages} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronRight size={20}/></button>
+              </Card>
+              
+              <Card className="lg:col-span-2 flex flex-col">
+                <div className="space-y-3 flex-1">
+                  {displayedMatches1v1.length === 0 && <div className="text-center text-slate-500 py-10">생성된 매치가 없습니다.</div>}
+                  {displayedMatches1v1.map(match => renderMatchItem(match))}
                 </div>
-              )}
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderMatchItem = (match) => {
-    const isPending = match.status === 'pending';
-    const totalPot = match.bet * (match.playerIds?.length || 1);
-    return (
-      <div key={match.id} className={`bg-slate-900/50 border ${isPending ? 'border-amber-500/20' : 'border-slate-700/50 opacity-80'} rounded-xl p-4 flex flex-col gap-4 relative group`}>
-        
-        {/* 관리자용 매치 삭제/수정 버튼 */}
-        {currentUser.role === 'admin' && (
-          <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => {setMatchToEdit(match); setEditMatchTitle(match.gameTitle);}} className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="제목 수정"><Edit2 size={14}/></button>
-            <button onClick={() => setMatchToDelete(match)} className="p-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/40 transition-colors" title="매치 삭제"><Trash2 size={14}/></button>
+                {total1v1Pages > 1 && (
+                  <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-700/50">
+                    <button onClick={() => setPage1v1(p => Math.max(1, p - 1))} disabled={page1v1 === 1} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronLeft size={20}/></button>
+                    <span className="text-sm font-bold text-amber-400">{page1v1} <span className="text-slate-500">/ {total1v1Pages}</span></span>
+                    <button onClick={() => setPage1v1(p => Math.min(total1v1Pages, p + 1))} disabled={page1v1 === total1v1Pages} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronRight size={20}/></button>
+                  </div>
+                )}
+              </Card>
+            </div>
           </div>
         )}
 
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3 pr-16">
-          <div><h4 className="text-white font-bold text-lg mb-1">{match.gameTitle || '미지정 게임'}</h4><div className="bg-slate-800 text-amber-400 font-mono text-xs px-2 py-1 rounded border border-amber-500/20 inline-flex items-center gap-1"><Trophy size={12} /> 총 상금 {totalPot}C</div></div>
-          <div>{!isPending ? <div className="text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg border text-xs font-bold"><CheckCircle2 size={14} className="inline"/> 분배 완료</div> : <Button variant="outline" className="py-1 px-3 text-xs" onClick={() => {setResolveMatchData(match); setResolveWinners([]);}}>승리자 선택</Button>}</div>
-        </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          {match.playerIds?.map(id => {
-            const player = userMap[id] || { name: '알 수 없음', avatar: 'https://i.pravatar.cc/150?u=unknown' };
-            const isWinner = !isPending && match.winners?.includes(id);
-            const reward = isWinner ? match.rewardPerWinner : 0;
-            return (
-              <div key={id} className={`flex flex-col items-center gap-1.5 p-2 rounded-xl ${isWinner ? 'bg-amber-500/10' : ''}`}>
-                <div className="relative"><img src={player.avatar} className={`w-12 h-12 rounded-full border-2 object-cover bg-slate-900 ${isWinner ? 'border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'border-slate-600'}`} />{isWinner && <Crown size={16} className="absolute -top-2 -right-1 text-amber-400 rotate-12" />}</div>
-                <span className={`text-xs ${isWinner ? 'text-amber-400 font-bold' : 'text-slate-300'}`}>{player.name}</span>
-                {!isPending && <span className="text-[10px] font-mono font-bold text-amber-400">{isWinner ? `+${reward}C` : `0C`}</span>}
-              </div>
-            );
-          })}
-        </div>
+        {matchTab === 'multi' && (
+          <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-2"><Users className="text-amber-400" size={24} /><h2 className="text-2xl font-bold text-white">다인원 코인 쟁탈전</h2></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-1 h-fit bg-slate-800/80">
+                <h3 className="text-lg font-bold text-white mb-4">다인원 매치 신청</h3>
+                <div className="space-y-4">
+                  <div><label className="block text-sm text-slate-300 mb-2">게임 제목</label><input type="text" value={gameTitleMulti} onChange={(e) => setGameTitleMulti(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none" /></div>
+                  <div>
+                    <label className="block text-sm text-slate-300 mb-2">상대방 검색 및 다중 선택</label>
+                    <div className="relative mb-3"><input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 pl-9 text-sm text-white focus:border-amber-500 outline-none" /><Search size={16} className="absolute left-3 top-3 text-slate-500" /></div>
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                      {searchFilteredUsersMulti.map(u => {
+                        const toggleMultiOpponent = (id) => setSelectedOpponentsMulti(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+                        return (
+                          <button key={u.id} onClick={() => toggleMultiOpponent(u.id)} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${selectedOpponentsMulti.includes(u.id) ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><img src={u.avatar} className="w-5 h-5 rounded-full object-cover" />{u.name}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div><label className="block text-sm text-slate-300 mb-2">1인당 베팅할 코인</label><div className="relative"><input type="number" value={betAmountMulti} onChange={(e) => setBetAmountMulti(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 pl-10 text-white focus:border-amber-500 outline-none" /><Coins size={18} className="absolute left-3 top-3.5 text-amber-500" /></div></div>
+                  <Button className="w-full mt-2" onClick={handleCreateMultiMatch} disabled={!gameTitleMulti || selectedOpponentsMulti.length === 0 || !betAmountMulti || isTournamentEnded}><Swords size={18} /> 다인원 시작</Button>
+                  {isTournamentEnded && <p className="text-xs text-red-400 text-center mt-2">대회가 종료되어 매치를 생성할 수 없습니다.</p>}
+                </div>
+              </Card>
+              <Card className="lg:col-span-2 flex flex-col">
+                <div className="space-y-3 flex-1">
+                  {displayedMatchesMulti.length === 0 && <div className="text-center text-slate-500 py-10">생성된 다인원 매치가 없습니다.</div>}
+                  {displayedMatchesMulti.map(match => renderMatchItem(match))}
+                </div>
+                {totalMultiPages > 1 && (
+                  <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-700/50">
+                    <button onClick={() => setPageMulti(p => Math.max(1, p - 1))} disabled={pageMulti === 1} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronLeft size={20}/></button>
+                    <span className="text-sm font-bold text-amber-400">{pageMulti} <span className="text-slate-500">/ {totalMultiPages}</span></span>
+                    <button onClick={() => setPageMulti(p => Math.min(totalMultiPages, p + 1))} disabled={pageMulti === totalMultiPages} className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30"><ChevronRight size={20}/></button>
+                  </div>
+                )}
+              </Card>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -890,7 +871,7 @@ export default function App() {
                   <h3 className="text-xl font-bold text-white">{schedule.title} {isFull && <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-md">마감</span>}</h3>
                   <div className="flex gap-4 text-sm text-slate-300"><div><Clock size={16} className="inline text-amber-400"/> {schedule.time}</div><div><MapPin size={16} className="inline text-amber-400"/> {schedule.location}</div></div>
                   <div className="flex flex-wrap gap-2 pt-2">
-                    {attendeesList.map(id => <img key={id} src={userMap[id]?.avatar} className="w-8 h-8 rounded-full border border-slate-600 object-cover bg-slate-800" title={userMap[id]?.name} />)}
+                    {attendeesList.map(id => <img key={id} src={userMap[id]?.avatar} className="w-8 h-8 rounded-full border border-slate-600 object-cover" title={userMap[id]?.name} />)}
                     {attendeesList.length === 0 && <span className="text-xs text-slate-600">아직 참석자가 없습니다.</span>}
                   </div>
                 </div>
@@ -910,70 +891,17 @@ export default function App() {
     <div className="min-h-screen bg-[#0a0f1c] text-slate-200 font-sans selection:bg-amber-500/30">
       {rankingAlert && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-900 px-6 py-3 rounded-full font-bold shadow-lg animate-in slide-in-from-top-4 fade-in duration-300">{rankingAlert}</div>}
 
-      {/* 명예의 전당 텍스트 수정 모달 (관리자용) */}
-      {showHofEditModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in zoom-in-95">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Edit3 className="text-amber-400"/> 명예의 전당 문구 수정</h3><button onClick={() => setShowHofEditModal(false)} className="text-slate-400"><X size={24} /></button></div>
-            <div className="space-y-4">
-              <div><label className="block text-sm text-slate-300 mb-2">메인 타이틀</label><input type="text" value={hofEditData.title} onChange={e=>setHofEditData({...hofEditData, title: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500"/></div>
-              <div><label className="block text-sm text-slate-300 mb-2">서브 타이틀</label><textarea value={hofEditData.subtitle} onChange={e=>setHofEditData({...hofEditData, subtitle: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500 resize-none h-20"/></div>
-              <Button className="w-full mt-4" onClick={handleSaveHofText}>저장 및 반영</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 매치 삭제 확인 모달 (관리자용) */}
-      {matchToDelete && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in zoom-in-95 duration-200">
-          <div className="bg-slate-900 border border-red-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
-            <AlertTriangle size={48} className="text-red-500 mb-4 mx-auto" />
-            <h3 className="text-xl font-bold text-white mb-2">매치를 정말 삭제할까요?</h3>
-            <p className="text-sm text-slate-400 mb-6">
-              [{matchToDelete.gameTitle}] 매치를 삭제합니다.<br/>
-              {matchToDelete.status === 'pending' ? <span className="text-amber-400 font-bold mt-1 block">아직 진행 중인 게임이므로,<br/>참여자들이 낸 베팅 코인은 모두 환불됩니다.</span> : <span className="text-red-400 mt-1 block">이미 종료된 매치는 삭제해도<br/>지급된 코인이 회수되지 않습니다. (기록만 삭제)</span>}
-            </p>
-            <div className="flex gap-4 w-full">
-              <Button variant="secondary" className="flex-1" onClick={() => setMatchToDelete(null)}>취소</Button>
-              <Button variant="danger" className="flex-1" onClick={confirmDeleteMatch}>삭제 확정</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 매치 제목 수정 모달 (관리자용) */}
-      {matchToEdit && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in zoom-in-95 duration-200">
-          <div className="bg-slate-900 border border-amber-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Edit2 className="text-amber-400"/> 매치 제목 수정</h3>
-            <input type="text" value={editMatchTitle} onChange={e => setEditMatchTitle(e.target.value)} placeholder="새로운 게임 이름" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none mb-4" />
-            <div className="flex gap-3">
-              <Button variant="secondary" className="flex-1" onClick={() => {setMatchToEdit(null); setEditMatchTitle('');}}>취소</Button>
-              <Button className="flex-1" onClick={handleEditMatchTitle} disabled={!editMatchTitle}>저장</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 내 프로필 수정 모달 */}
       {showProfileEdit && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-white"><Edit3 size={20} className="inline text-amber-400"/> 프로필 수정</h3><button onClick={() => setShowProfileEdit(false)} className="text-slate-400"><X size={24} /></button></div>
             <div className="space-y-4">
-              <div className="flex justify-center mb-4"><img src={profileEditData.avatar} className="w-20 h-20 rounded-full border-2 border-amber-500 shadow-lg object-cover bg-slate-900" /></div>
+              <div className="flex justify-center mb-4"><img src={profileEditData.avatar} className="w-20 h-20 rounded-full border-2 border-amber-500 shadow-lg object-cover" /></div>
               <div>
                 <label className="block text-sm text-slate-300 mb-1 font-bold">프로필 사진 첨부</label>
-                <label className={`flex flex-col items-center justify-center w-full h-20 border-2 border-slate-700 border-dashed rounded-xl ${isUploading ? 'bg-slate-800 cursor-not-allowed' : 'cursor-pointer bg-slate-900/50 hover:bg-slate-800'} transition-colors`}>
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    {isUploading ? (
-                      <span className="text-amber-400 font-bold text-xs animate-pulse">사진 압축 및 처리중...</span>
-                    ) : (
-                      <><ImagePlus size={24} className="text-slate-400 mb-1" /><p className="text-xs text-slate-400">클릭하여 파일 선택 (자동 리사이징 적용)</p></>
-                    )}
-                  </div>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
+                <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-900/50 hover:bg-slate-800 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6"><ImagePlus size={24} className="text-slate-400 mb-1" /><p className="text-xs text-slate-400">클릭하여 파일 선택 (자동 압축)</p></div>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                 </label>
               </div>
               <div><label className="block text-sm text-slate-300 mb-1">닉네임</label><input type="text" value={profileEditData.name} onChange={e => setProfileEditData({...profileEditData, name: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none" /></div>
@@ -981,7 +909,20 @@ export default function App() {
                 <div className="flex-1"><label className="block text-sm text-slate-300 mb-1">학과</label><input type="text" value={profileEditData.department} onChange={e => setProfileEditData({...profileEditData, department: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none" /></div>
                 <div className="w-1/3"><label className="block text-sm text-slate-300 mb-1">입학 학년</label><input type="number" value={profileEditData.year} onChange={e => setProfileEditData({...profileEditData, year: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none" /></div>
               </div>
-              <Button className="w-full mt-4 py-3" onClick={saveProfileEdit} disabled={isUploading}>저장 및 적용</Button>
+              <Button className="w-full mt-4 py-3" onClick={saveProfileEdit}>저장 및 적용</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEditingHof && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-800 border border-amber-500/50 rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col">
+            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Edit3 className="text-amber-400" size={20}/> 명예의 전당 문구 수정</h3><button onClick={() => setIsEditingHof(false)} className="text-slate-400"><X size={24} /></button></div>
+            <div className="space-y-4">
+              <div><label className="text-sm text-slate-300 block mb-2 font-bold">제목</label><input type="text" value={editHofData.title} onChange={e=>setEditHofData({...editHofData, title: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500 transition-colors"/></div>
+              <div><label className="text-sm text-slate-300 block mb-2 font-bold">설명 (부제목)</label><input type="text" value={editHofData.subtitle} onChange={e=>setEditHofData({...editHofData, subtitle: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500 transition-colors"/></div>
+              <Button className="w-full mt-2" onClick={async () => { await setDoc(doc(db, "settings", "appInfo"), { hofTitle: editHofData.title, hofSubtitle: editHofData.subtitle }, { merge: true }); setIsEditingHof(false); }}>저장 및 적용</Button>
             </div>
           </div>
         </div>
@@ -1005,6 +946,34 @@ export default function App() {
         </div>
       )}
 
+      {editingMatchData && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in zoom-in-95">
+          <div className="bg-slate-800 border border-amber-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Edit3 size={20} className="text-amber-400"/>매치 정보 수정</h3>
+            <label className="block text-sm text-slate-300 mb-2">게임명 변경</label>
+            <input type="text" value={editingMatchData.gameTitle} onChange={e => setEditingMatchData({...editingMatchData, gameTitle: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500 mb-6" />
+            <div className="flex gap-3">
+               <Button variant="secondary" className="flex-1" onClick={() => setEditingMatchData(null)}>취소</Button>
+               <Button className="flex-1" onClick={async () => { await updateDoc(doc(db, "matches", editingMatchData.id), { gameTitle: editingMatchData.gameTitle }); setEditingMatchData(null); }}>저장</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {matchToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in zoom-in-95">
+          <div className="bg-slate-800 border border-red-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <AlertTriangle size={32} className="text-red-500 mb-3 mx-auto" />
+            <h3 className="text-xl font-bold text-white mb-2 text-center">매치 삭제 경고</h3>
+            <p className="text-sm text-slate-400 mb-6 text-center">이 매치를 영구적으로 삭제하시겠습니까?<br/><span className="text-amber-400 font-bold">{matchToDelete.status === 'pending' ? '베팅된 코인은 전액 자동 환불됩니다.' : '이미 완료되어 분배된 코인은 회수되지 않습니다.'}</span></p>
+            <div className="flex gap-3">
+               <Button variant="secondary" className="flex-1" onClick={() => setMatchToDelete(null)}>취소</Button>
+               <Button variant="danger" className="flex-1" onClick={confirmDeleteMatch}>삭제 확정</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAdminCodeModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in zoom-in-95 duration-200">
           <div className="bg-slate-900 border border-red-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
@@ -1016,7 +985,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 관리자 패널 */}
       {showAdminPanel && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-red-500/50 rounded-2xl p-6 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative">
@@ -1090,7 +1058,7 @@ export default function App() {
                     <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-4">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-3">
-                          <img src={userMap[adminSelectedUser].avatar} className="w-12 h-12 rounded-full border-2 border-slate-600 object-cover bg-slate-900" alt="avatar"/>
+                          <img src={userMap[adminSelectedUser].avatar} className="w-12 h-12 rounded-full border-2 border-slate-600 object-cover" alt="avatar"/>
                           <div>
                             <h4 className="font-bold text-white text-lg flex items-center gap-2">
                               {userMap[adminSelectedUser].name} 
@@ -1171,11 +1139,23 @@ export default function App() {
                   <div className="bg-slate-800 p-6 rounded-xl border border-slate-700/50 flex flex-col items-center gap-4">
                     <img src={appLogo} className="w-32 h-32 rounded-2xl object-cover object-center shadow-lg bg-slate-900" alt="Current Logo"/>
                     <label className={`cursor-pointer border px-4 py-2 rounded-xl text-sm font-bold transition-colors ${isUploading ? 'bg-slate-700 border-slate-600 text-slate-400' : 'bg-slate-900 hover:bg-slate-700 border-slate-600 text-slate-300'}`}>
-                      {isUploading ? '로고 처리 및 서버 업로드 중...' : '새 로고 이미지 서버에 등록'}
+                      {isUploading ? '로고 압축 및 업로드 중...' : '새 로고 이미지 업로드'}
                       <input type="file" className="hidden" accept="image/*" onChange={handleAppLogoUpload} disabled={isUploading} />
                     </label>
-                    <p className="text-xs text-slate-500 text-center">모든 사용자 화면의 로고가 즉시 바뀝니다.<br/>자동으로 적절한 크기로 압축되어 데이터베이스에 저장됩니다.</p>
-                    <Button variant="outline" className="mt-2 text-xs py-1.5 border-slate-600 text-slate-400 hover:text-white hover:border-slate-400" onClick={restoreDefaultLogo} disabled={isUploading}>기본 로고로 복원</Button>
+                    <p className="text-xs text-slate-500 text-center">모든 사용자 화면의 로고가 즉시 바뀝니다.</p>
+                    <Button variant="outline" className="mt-2 text-xs py-1.5 border-slate-600 text-slate-400 hover:text-white hover:border-slate-400" onClick={async () => { await setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO }, { merge: true }); }} disabled={isUploading}>기본 로고로 복원</Button>
+                  </div>
+                </div>
+                <div className="border-t border-slate-700/50 pt-6">
+                  <h4 className="font-bold text-white mb-3">신규 가입자 기본 지급 코인 설정</h4>
+                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700/50 flex flex-col md:flex-row items-start md:items-center gap-4">
+                     <div className="flex-1">
+                       <p className="text-sm text-slate-300 mb-1">새로운 유저가 회원가입할 때 기본으로 지급받는 시작 코인입니다.</p>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <input type="number" value={adminStartingCoin} onChange={e => setAdminStartingCoin(Number(e.target.value))} className="w-32 bg-slate-900 border border-slate-700 rounded-xl p-2 text-white outline-none focus:border-amber-500"/>
+                       <Button onClick={async () => { await setDoc(doc(db, "settings", "appInfo"), { defaultStartingCoin: adminStartingCoin }, { merge: true }); }}>저장</Button>
+                     </div>
                   </div>
                 </div>
               </div>
@@ -1192,7 +1172,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3 mb-6 max-h-60 overflow-y-auto">
               {resolveMatchData.playerIds?.map(id => {
                 const isSelected = resolveWinners.includes(id);
-                return <button key={id} onClick={() => {setResolveWinners(prev => prev.includes(id) ? prev.filter(w=>w!==id) : [...prev, id])}} className={`p-3 rounded-xl border-2 flex items-center gap-3 ${isSelected ? 'border-amber-500 bg-amber-500/20 text-amber-400' : 'border-slate-700 bg-slate-900 text-slate-300'}`}><img src={userMap[id]?.avatar} className="w-8 h-8 rounded-full object-cover bg-slate-800" />{userMap[id]?.name}</button>;
+                return <button key={id} onClick={() => {setResolveWinners(prev => prev.includes(id) ? prev.filter(w=>w!==id) : [...prev, id])}} className={`p-3 rounded-xl border-2 flex items-center gap-3 ${isSelected ? 'border-amber-500 bg-amber-500/20 text-amber-400' : 'border-slate-700 bg-slate-900 text-slate-300'}`}><img src={userMap[id]?.avatar} className="w-8 h-8 rounded-full object-cover" />{userMap[id]?.name}</button>;
               })}
             </div>
             <Button className="w-full" onClick={confirmMatchResolve} disabled={resolveWinners.length === 0}>결과 확정 및 분배</Button>
@@ -1203,25 +1183,24 @@ export default function App() {
       {showTournamentSettings && editTournamentData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
-            <h3 className="text-xl font-bold text-white mb-6 shrink-0">대회 설정 관리</h3>
+            <h3 className="text-xl font-bold text-white mb-6 shrink-0 flex items-center gap-2"><Settings className="text-amber-400" /> 대회 설정 관리</h3>
             <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2 flex-1">
               <div><label className="text-sm text-slate-300 block mb-2 font-bold">대회 제목</label><input type="text" value={editTournamentData.title} onChange={e=>setEditTournamentData({...editTournamentData, title: e.target.value})} placeholder="대회 제목을 입력하세요" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500 transition-colors"/></div>
               <div><label className="text-sm text-slate-300 block mb-2 font-bold">대회 설명</label><textarea value={editTournamentData.description || ''} onChange={e=>setEditTournamentData({...editTournamentData, description: e.target.value})} placeholder="대회에 대한 간단한 규칙이나 설명을 작성해주세요." className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500 transition-colors resize-none h-24"></textarea></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="text-sm text-slate-300 block mb-2 font-bold">시작일</label><input type="date" value={editTournamentData.startDate} onChange={e=>setEditTournamentData({...editTournamentData, startDate: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500"/></div>
-                <div><label className="text-sm text-slate-300 block mb-2 font-bold">종료일</label><input type="date" value={editTournamentData.endDate} onChange={e=>setEditTournamentData({...editTournamentData, endDate: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500"/></div>
+                <div><label className="text-sm text-slate-300 block mb-2 font-bold">종료일 (자동종료처리)</label><input type="date" value={editTournamentData.endDate} onChange={e=>setEditTournamentData({...editTournamentData, endDate: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500"/></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-sm text-slate-300 block mb-2 font-bold">코인 지급 요일</label><select value={editTournamentData.payoutDay} onChange={e=>setEditTournamentData({...editTournamentData, payoutDay: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500">{WEEK_DAYS.map(d=><option key={d} value={d}>{d}요일</option>)}</select></div>
-                <div><label className="text-sm text-slate-300 block mb-2 font-bold">주간 지급액</label><input type="number" value={editTournamentData.weeklyCoin} onChange={e=>setEditTournamentData({...editTournamentData, weeklyCoin: Number(e.target.value)})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500"/></div>
-              </div>
+              <div><label className="text-sm text-slate-300 block mb-2 font-bold">코인 지급 안내 문구</label><input type="text" value={editTournamentData.payoutMessage || ''} onChange={e=>setEditTournamentData({...editTournamentData, payoutMessage: e.target.value})} placeholder="예: 매주 화요일 모든 유저에게 1,000C 지급!" className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500"/></div>
             </div>
-            <Button className="w-full mt-6 shrink-0" onClick={async () => { setTournaments([editTournamentData]); await setDoc(doc(db, "tournaments", editTournamentData.id), editTournamentData); setShowTournamentSettings(false); }}>설정 저장</Button>
+            <div className="flex gap-3 mt-6 shrink-0">
+               <Button variant="secondary" className="flex-1" onClick={() => setShowTournamentSettings(false)}>취소</Button>
+               <Button className="flex-1" onClick={async () => { setTournaments([editTournamentData]); await setDoc(doc(db, "tournaments", editTournamentData.id), editTournamentData); setShowTournamentSettings(false); }}>설정 저장</Button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 메인 레이아웃 */}
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row min-h-screen">
         <aside className="hidden md:flex flex-col w-64 border-r border-slate-800 p-6 sticky top-0 h-screen bg-[#0a0f1c]/80 backdrop-blur-xl">
           <div onClick={handleLogoClick} className="flex items-center gap-3 mb-12 text-amber-400 cursor-pointer select-none">
@@ -1236,7 +1215,7 @@ export default function App() {
           <div className="mt-auto pt-6 border-t border-slate-800">
             <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 hover:bg-slate-800 transition-colors">
               <div onClick={openProfileEdit} className="flex items-center gap-3 cursor-pointer flex-1 overflow-hidden">
-                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-slate-600 object-cover shrink-0 bg-slate-900" />
+                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-slate-600 object-cover shrink-0" />
                 <div className="overflow-hidden">
                   <div className="text-sm font-bold text-white truncate">{currentUser.name}</div>
                   <div className="text-xs text-amber-400 font-mono font-bold flex items-center gap-1 mt-0.5"><Coins size={12} /> {(currentUser.coins || 0).toLocaleString()} C</div>
@@ -1250,13 +1229,18 @@ export default function App() {
         </aside>
 
         <header className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-[#0a0f1c]/90 sticky top-0 z-50">
-          <div onClick={handleLogoClick} className="flex items-center gap-2 text-amber-400">
-            <img src={appLogo} className="w-10 h-10 rounded-lg object-cover object-center bg-slate-900" />
-            <span className="font-black text-lg">Avalon</span>
+          <div onClick={openProfileEdit} className="flex items-center gap-3 cursor-pointer">
+            <img src={currentUser.avatar} className="w-10 h-10 rounded-full border-2 border-slate-600 object-cover shadow-lg" />
+            <div className="flex flex-col">
+              <span className="font-bold text-white text-sm">{currentUser.name}</span>
+              <span className="text-xs text-amber-400 font-mono font-bold">{(currentUser.coins || 0).toLocaleString()} C</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div onClick={openProfileEdit} className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700"><Coins size={14} className="text-amber-400" /><span className="text-sm font-mono font-bold text-white">{(currentUser.coins || 0).toLocaleString()}</span></div>
-            <button onClick={handleLogout} className="text-slate-400 hover:text-red-400"><LogOut size={20}/></button>
+          <div className="flex items-center gap-2">
+            {currentUser.role === 'admin' && (
+               <button onClick={handleLogoClick} className="w-8 h-8 flex items-center justify-center bg-slate-800 rounded-full border border-slate-700 text-slate-400 hover:text-amber-400"><Settings size={16}/></button>
+            )}
+            <button onClick={handleLogout} className="w-8 h-8 flex items-center justify-center bg-slate-800 rounded-full border border-slate-700 text-slate-400 hover:text-red-400"><LogOut size={16}/></button>
           </div>
         </header>
 
