@@ -25,13 +25,14 @@ import {
 // --- 파이어베이스 설정 (기지국 연결) ---
 // 주의: 내 컴퓨터(VS Code)에서 실행할 때는 아래 임시 텍스트를 지우고, 
 // 파이어베이스 콘솔에서 복사한 본인의 실제 firebaseConfig 값으로 교체해야 합니다.
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+const firebaseConfig = {
+  apiKey: "AIzaSyAi8auHjahGA-AFGWYW-Ig1kaF4FWwu6Cc",
+  authDomain: "avalon-593e7.firebaseapp.com",
+  projectId: "avalon-593e7",
+  storageBucket: "avalon-593e7.firebasestorage.app",
+  messagingSenderId: "469158636943",
+  appId: "1:469158636943:web:2066f081ee7ce3bd29effa",
+  measurementId: "G-DDQL245JG0"
 };
 
 // 파이어베이스 엔진을 가동합니다.
