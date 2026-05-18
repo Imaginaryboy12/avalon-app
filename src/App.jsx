@@ -5,7 +5,7 @@ import {
   ChevronRight, Plus, CheckCircle2, ChevronLeft,
   Settings, Clock, MapPin, X, AlertTriangle, Users, User, Search,
   ShieldAlert, History, ArrowUpCircle, ArrowDownCircle,
-  LogOut, UserCircle, KeyRound, BookOpen, GraduationCap, BadgeInfo, Edit3, ImagePlus, Check
+  LogOut, UserCircle, KeyRound, BookOpen, GraduationCap, BadgeInfo, Edit3, ImagePlus, Check, Trash2, Edit2
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
@@ -40,14 +40,18 @@ const INITIAL_TOURNAMENTS = [
 ];
 
 const INITIAL_MATCHES = [
-  { id: 'm1', tId: 't1', type: '1v1', gameTitle: '테라포밍 마스', playerIds: ['u1', 'u2'], bet: 1000, status: 'pending', winners: [], rewardPerWinner: 0 },
-  { id: 'm2', tId: 't1', type: 'multi', gameTitle: '아발론', playerIds: ['u1', 'u3', 'u4'], bet: 500, status: 'pending', winners: [], rewardPerWinner: 0 },
-  { id: 'm5', tId: 't1', type: '1v1', gameTitle: '카탄', playerIds: ['u1', 'u5'], bet: 600, status: 'completed', winners: ['u1'], rewardPerWinner: 1200 },
+  { id: 'm1', tId: 't1', type: '1v1', gameTitle: '테라포밍 마스', playerIds: ['u1', 'u2'], bet: 1000, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 1 },
+  { id: 'm2', tId: 't1', type: 'multi', gameTitle: '아발론', playerIds: ['u1', 'u3', 'u4'], bet: 500, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 2 },
+  { id: 'm3', tId: 't1', type: '1v1', gameTitle: '스플렌더', playerIds: ['u3', 'u4'], bet: 300, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 3 },
+  { id: 'm4', tId: 't1', type: '1v1', gameTitle: '세븐 원더스', playerIds: ['u2', 'u5'], bet: 800, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: 4 },
+  { id: 'm5', tId: 't1', type: '1v1', gameTitle: '카탄', playerIds: ['u1', 'u5'], bet: 600, status: 'completed', winners: ['u1'], rewardPerWinner: 1200, createdAt: 5 },
 ];
 
 const WEEK_DAYS = ['월', '화', '수', '목', '금', '토', '일'];
 
 const DEFAULT_LOGO = 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=300&auto=format&fit=crop';
+const DEFAULT_HOF_TITLE = "명예의 전당";
+const DEFAULT_HOF_SUBTITLE = "최고의 보드게임 마스터를 향한 위대한 여정";
 
 const toLocalDateString = (date) => {
   const year = date.getFullYear();
@@ -76,7 +80,6 @@ const compressImage = (file, maxSize = 300) => {
         let width = img.width;
         let height = img.height;
 
-        // 비율 유지하며 최대 사이즈로 축소
         if (width > height) {
           if (width > maxSize) { height *= maxSize / width; width = maxSize; }
         } else {
@@ -87,8 +90,6 @@ const compressImage = (file, maxSize = 300) => {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        
-        // JPEG 포맷으로 화질 80% 압축 (Base64 텍스트 반환)
         resolve(canvas.toDataURL('image/jpeg', 0.8));
       };
     };
@@ -122,7 +123,11 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [coinHistory, setCoinHistory] = useState([]);
-  const [appLogo, setAppLogo] = useState(DEFAULT_LOGO); // 로고 상태
+
+  // 앱 설정 관련 상태 (로고 및 명예의 전당 텍스트)
+  const [appLogo, setAppLogo] = useState(DEFAULT_LOGO);
+  const [hofTitle, setHofTitle] = useState(DEFAULT_HOF_TITLE);
+  const [hofSubtitle, setHofSubtitle] = useState(DEFAULT_HOF_SUBTITLE);
 
   const [loggedInUserId, setLoggedInUserId] = useState(() => localStorage.getItem('avalon_loggedInUserId') || null);
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('avalon_loggedInUserId'));
@@ -137,7 +142,7 @@ export default function App() {
 
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [profileEditData, setProfileEditData] = useState({ name: '', department: '', year: '', avatar: '' });
-  const [isUploading, setIsUploading] = useState(false); // 업로드 로딩 상태
+  const [isUploading, setIsUploading] = useState(false);
 
   const [currentView, setCurrentView] = useState('home');
   
@@ -151,13 +156,7 @@ export default function App() {
   const [selectedDateObj, setSelectedDateObj] = useState(new Date());
 
   const [showAddSchedule, setShowAddSchedule] = useState(false);
-  const [newScheduleData, setNewScheduleData] = useState({
-    title: '새로운 정기 모임',
-    date: toLocalDateString(new Date()),
-    time: '19:00',
-    location: '아발론 동아리방',
-    maxAttendees: 11
-  });
+  const [newScheduleData, setNewScheduleData] = useState({ title: '새로운 정기 모임', date: toLocalDateString(new Date()), time: '19:00', location: '아발론 동아리방', maxAttendees: 11 });
 
   const [showTournamentSettings, setShowTournamentSettings] = useState(false);
   const [editTournamentData, setEditTournamentData] = useState(null);
@@ -176,6 +175,14 @@ export default function App() {
   
   const [resolveMatchData, setResolveMatchData] = useState(null); 
   const [resolveWinners, setResolveWinners] = useState([]);
+
+  // 관리자 전용 팝업 상태들
+  const [showHofEditModal, setShowHofEditModal] = useState(false);
+  const [hofEditData, setHofEditData] = useState({ title: '', subtitle: '' });
+
+  const [matchToDelete, setMatchToDelete] = useState(null);
+  const [matchToEdit, setMatchToEdit] = useState(null);
+  const [editMatchTitle, setEditMatchTitle] = useState('');
   
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [logoClicks, setLogoClicks] = useState(0);
@@ -189,12 +196,15 @@ export default function App() {
   const [userToDelete, setUserToDelete] = useState(null);
 
   useEffect(() => {
-    // 1. App Settings (Global Logo Sync)
+    // 1. App Settings (Global Logo & HOF Text Sync)
     const unsubSettings = onSnapshot(doc(db, "settings", "appInfo"), (snapshot) => {
       if (snapshot.exists()) {
-        setAppLogo(snapshot.data().logo || DEFAULT_LOGO);
+        const data = snapshot.data();
+        setAppLogo(data.logo || DEFAULT_LOGO);
+        setHofTitle(data.hofTitle || DEFAULT_HOF_TITLE);
+        setHofSubtitle(data.hofSubtitle || DEFAULT_HOF_SUBTITLE);
       } else {
-        setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO });
+        setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO, hofTitle: DEFAULT_HOF_TITLE, hofSubtitle: DEFAULT_HOF_SUBTITLE });
       }
     }, (error) => console.error(error));
 
@@ -216,13 +226,17 @@ export default function App() {
       }
     }, (error) => console.error(error));
 
-    // 4. 매치 내역
+    // 4. 매치 내역 (★ createdAt 기준으로 정렬하여 최신 매치가 무조건 1페이지 상단에 오도록 수정)
     const unsubMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
       if (snapshot.empty && users.length > 0) {
         INITIAL_MATCHES.forEach(async (m) => { await setDoc(doc(db, "matches", m.id), m); });
       } else {
         const list = snapshot.docs.map(doc => doc.data());
-        setMatches(list.sort((a, b) => b.id.localeCompare(a.id)));
+        setMatches(list.sort((a, b) => {
+          const timeA = a.createdAt || 0;
+          const timeB = b.createdAt || 0;
+          return timeB - timeA; // 내림차순 정렬 (최신이 먼저)
+        }));
       }
     }, (error) => console.error(error));
 
@@ -346,13 +360,12 @@ export default function App() {
     setShowProfileEdit(true);
   };
 
-  // 개인 프로필 사진 첨부 및 압축
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setIsUploading(true);
       try {
-        const compressedBase64 = await compressImage(file, 200); // 프로필은 최대 200px 압축
+        const compressedBase64 = await compressImage(file, 200); 
         setProfileEditData({ ...profileEditData, avatar: compressedBase64 });
       } catch (err) {
         console.error("이미지 처리 실패:", err);
@@ -372,14 +385,12 @@ export default function App() {
     setShowProfileEdit(false);
   };
 
-  // 관리자 앱 로고 첨부 및 글로벌 압축 적용
   const handleAppLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setIsUploading(true);
       try {
-        const compressedBase64 = await compressImage(file, 400); // 앱 로고는 최대 400px 압축
-        // 전역 Firestore 문서 업데이트
+        const compressedBase64 = await compressImage(file, 400); 
         await setDoc(doc(db, "settings", "appInfo"), { logo: compressedBase64 }, { merge: true });
       } catch (err) {
         console.error("로고 업로드 실패:", err);
@@ -389,9 +400,13 @@ export default function App() {
     }
   };
   
-  // 앱 기본 로고로 복구 (관리자)
   const restoreDefaultLogo = async () => {
     await setDoc(doc(db, "settings", "appInfo"), { logo: DEFAULT_LOGO }, { merge: true });
+  };
+
+  const handleSaveHofText = async () => {
+    await setDoc(doc(db, "settings", "appInfo"), { hofTitle: hofEditData.title, hofSubtitle: hofEditData.subtitle }, { merge: true });
+    setShowHofEditModal(false);
   };
 
   const handleLogoClick = () => {
@@ -472,7 +487,7 @@ export default function App() {
     }
     
     const matchId = `m${Date.now()}`;
-    const newMatch = { id: matchId, tId: tournaments[0].id, type: '1v1', gameTitle: gameTitle1v1, playerIds: players, bet: betNum, status: 'pending', winners: [], rewardPerWinner: 0 };
+    const newMatch = { id: matchId, tId: tournaments[0].id, type: '1v1', gameTitle: gameTitle1v1, playerIds: players, bet: betNum, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: Date.now() };
     
     await setDoc(doc(db, "matches", matchId), newMatch);
     players.forEach(async (id) => {
@@ -498,7 +513,7 @@ export default function App() {
     }
     
     const matchId = `m${Date.now()}`;
-    const newMatch = { id: matchId, tId: tournaments[0].id, type: 'multi', gameTitle: gameTitleMulti, playerIds: players, bet: betNum, status: 'pending', winners: [], rewardPerWinner: 0 };
+    const newMatch = { id: matchId, tId: tournaments[0].id, type: 'multi', gameTitle: gameTitleMulti, playerIds: players, bet: betNum, status: 'pending', winners: [], rewardPerWinner: 0, createdAt: Date.now() };
     
     await setDoc(doc(db, "matches", matchId), newMatch);
     players.forEach(async (id) => {
@@ -509,6 +524,34 @@ export default function App() {
 
     setGameTitleMulti(''); setSelectedOpponentsMulti([]); setSearchQuery(''); setBetAmountMulti('');
     setPageMulti(1);
+  };
+
+  // 관리자 기능: 매치 삭제 (환불 처리 포함)
+  const confirmDeleteMatch = async () => {
+    if (!matchToDelete) return;
+    const match = matchToDelete;
+    
+    // 아직 분배되지 않은 매치라면 베팅했던 코인 환불
+    if (match.status === 'pending') {
+      match.playerIds?.forEach(async (id) => {
+        const targetUser = userMap[id];
+        if (targetUser) {
+          await updateDoc(doc(db, "users", id), { coins: (targetUser.coins || 0) + match.bet });
+          await logCoinHistory(id, match.bet, `[${match.gameTitle}] 관리자 매치 삭제 (베팅 환불)`);
+        }
+      });
+    }
+    
+    await deleteDoc(doc(db, "matches", match.id));
+    setMatchToDelete(null);
+  };
+
+  // 관리자 기능: 매치 제목 수정
+  const handleEditMatchTitle = async () => {
+    if (!matchToEdit || !editMatchTitle) return;
+    await updateDoc(doc(db, "matches", matchToEdit.id), { gameTitle: editMatchTitle });
+    setMatchToEdit(null);
+    setEditMatchTitle('');
   };
 
   const toggleMultiOpponent = (id) => setSelectedOpponentsMulti(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
@@ -537,13 +580,7 @@ export default function App() {
   const handleAddSchedule = async () => {
     if (!newScheduleData.title || !newScheduleData.date) return;
     const scheId = `s_${Date.now()}`;
-    const newS = {
-      ...newScheduleData,
-      id: scheId,
-      maxAttendees: Number(newScheduleData.maxAttendees) || 11,
-      attendees: [],
-      isAuto: false
-    };
+    const newS = { ...newScheduleData, id: scheId, maxAttendees: Number(newScheduleData.maxAttendees) || 11, attendees: [], isAuto: false };
     await setDoc(doc(db, "schedules", scheId), newS);
     setShowAddSchedule(false);
   };
@@ -597,9 +634,19 @@ export default function App() {
 
   const renderHome = () => (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 p-8 shadow-2xl">
+      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 p-8 shadow-2xl group">
         <div className="absolute top-0 right-0 p-8 opacity-10"><Crown size={120} /></div>
-        <div className="relative z-10"><h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-500 mb-2">명예의 전당</h1><p className="text-slate-400 text-lg">최고의 보드게임 마스터를 향한 위대한 여정</p></div>
+        <div className="relative z-10 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-500 mb-2">{hofTitle}</h1>
+            <p className="text-slate-400 text-lg">{hofSubtitle}</p>
+          </div>
+          {currentUser.role === 'admin' && (
+            <button onClick={() => {setHofEditData({title: hofTitle, subtitle: hofSubtitle}); setShowHofEditModal(true);}} className="p-2 bg-slate-800 border border-slate-600 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100">
+              <Edit3 size={18} />
+            </button>
+          )}
+        </div>
       </div>
       <Card>
         <div className="flex items-center justify-between mb-6"><h2 className="text-xl font-bold text-white flex items-center gap-2"><Trophy className="text-amber-400" /> 종합 코인 랭킹</h2><span className="text-sm text-slate-400">실시간 업데이트</span></div>
@@ -755,8 +802,17 @@ export default function App() {
     const isPending = match.status === 'pending';
     const totalPot = match.bet * (match.playerIds?.length || 1);
     return (
-      <div key={match.id} className={`bg-slate-900/50 border ${isPending ? 'border-amber-500/20' : 'border-slate-700/50 opacity-80'} rounded-xl p-4 flex flex-col gap-4`}>
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+      <div key={match.id} className={`bg-slate-900/50 border ${isPending ? 'border-amber-500/20' : 'border-slate-700/50 opacity-80'} rounded-xl p-4 flex flex-col gap-4 relative group`}>
+        
+        {/* 관리자용 매치 삭제/수정 버튼 */}
+        {currentUser.role === 'admin' && (
+          <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => {setMatchToEdit(match); setEditMatchTitle(match.gameTitle);}} className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="제목 수정"><Edit2 size={14}/></button>
+            <button onClick={() => setMatchToDelete(match)} className="p-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/40 transition-colors" title="매치 삭제"><Trash2 size={14}/></button>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center border-b border-slate-800 pb-3 pr-16">
           <div><h4 className="text-white font-bold text-lg mb-1">{match.gameTitle || '미지정 게임'}</h4><div className="bg-slate-800 text-amber-400 font-mono text-xs px-2 py-1 rounded border border-amber-500/20 inline-flex items-center gap-1"><Trophy size={12} /> 총 상금 {totalPot}C</div></div>
           <div>{!isPending ? <div className="text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg border text-xs font-bold"><CheckCircle2 size={14} className="inline"/> 분배 완료</div> : <Button variant="outline" className="py-1 px-3 text-xs" onClick={() => {setResolveMatchData(match); setResolveWinners([]);}}>승리자 선택</Button>}</div>
         </div>
@@ -853,6 +909,52 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0a0f1c] text-slate-200 font-sans selection:bg-amber-500/30">
       {rankingAlert && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-900 px-6 py-3 rounded-full font-bold shadow-lg animate-in slide-in-from-top-4 fade-in duration-300">{rankingAlert}</div>}
+
+      {/* 명예의 전당 텍스트 수정 모달 (관리자용) */}
+      {showHofEditModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in zoom-in-95">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Edit3 className="text-amber-400"/> 명예의 전당 문구 수정</h3><button onClick={() => setShowHofEditModal(false)} className="text-slate-400"><X size={24} /></button></div>
+            <div className="space-y-4">
+              <div><label className="block text-sm text-slate-300 mb-2">메인 타이틀</label><input type="text" value={hofEditData.title} onChange={e=>setHofEditData({...hofEditData, title: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500"/></div>
+              <div><label className="block text-sm text-slate-300 mb-2">서브 타이틀</label><textarea value={hofEditData.subtitle} onChange={e=>setHofEditData({...hofEditData, subtitle: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-amber-500 resize-none h-20"/></div>
+              <Button className="w-full mt-4" onClick={handleSaveHofText}>저장 및 반영</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 매치 삭제 확인 모달 (관리자용) */}
+      {matchToDelete && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in zoom-in-95 duration-200">
+          <div className="bg-slate-900 border border-red-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
+            <AlertTriangle size={48} className="text-red-500 mb-4 mx-auto" />
+            <h3 className="text-xl font-bold text-white mb-2">매치를 정말 삭제할까요?</h3>
+            <p className="text-sm text-slate-400 mb-6">
+              [{matchToDelete.gameTitle}] 매치를 삭제합니다.<br/>
+              {matchToDelete.status === 'pending' ? <span className="text-amber-400 font-bold mt-1 block">아직 진행 중인 게임이므로,<br/>참여자들이 낸 베팅 코인은 모두 환불됩니다.</span> : <span className="text-red-400 mt-1 block">이미 종료된 매치는 삭제해도<br/>지급된 코인이 회수되지 않습니다. (기록만 삭제)</span>}
+            </p>
+            <div className="flex gap-4 w-full">
+              <Button variant="secondary" className="flex-1" onClick={() => setMatchToDelete(null)}>취소</Button>
+              <Button variant="danger" className="flex-1" onClick={confirmDeleteMatch}>삭제 확정</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 매치 제목 수정 모달 (관리자용) */}
+      {matchToEdit && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in zoom-in-95 duration-200">
+          <div className="bg-slate-900 border border-amber-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Edit2 className="text-amber-400"/> 매치 제목 수정</h3>
+            <input type="text" value={editMatchTitle} onChange={e => setEditMatchTitle(e.target.value)} placeholder="새로운 게임 이름" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:border-amber-500 outline-none mb-4" />
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => {setMatchToEdit(null); setEditMatchTitle('');}}>취소</Button>
+              <Button className="flex-1" onClick={handleEditMatchTitle} disabled={!editMatchTitle}>저장</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 내 프로필 수정 모달 */}
       {showProfileEdit && (
